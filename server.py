@@ -151,23 +151,26 @@ def main():
     global _data_dir, _mode
 
     parser = argparse.ArgumentParser(description="Advanced Memory MCP Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8765, help="Port to listen on (default: 8765)")
-    parser.add_argument("--data-dir", required=True, help="Directory for per-user JSONL data files")
+    parser.add_argument("--host", default=os.environ.get("MCP_HOST", "0.0.0.0"), help="Host to bind to (default: 0.0.0.0, env: MCP_HOST)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("MCP_PORT", "8765")), help="Port to listen on (default: 8765, env: MCP_PORT)")
+    parser.add_argument("--data-dir", default=os.environ.get("MCP_DATA_DIR"), help="Directory for per-user JSONL data files (env: MCP_DATA_DIR)")
     parser.add_argument(
         "--mode",
         choices=["read-write", "read-only"],
-        default="read-only",
-        help="Server mode (default: read-only)",
+        default=os.environ.get("MCP_MODE", "read-only"),
+        help="Server mode (default: read-only, env: MCP_MODE)",
     )
     parser.add_argument(
         "--transport",
         choices=["sse", "streamable-http"],
-        default="sse",
-        help="Transport protocol (default: sse)",
+        default=os.environ.get("MCP_TRANSPORT", "sse"),
+        help="Transport protocol (default: sse, env: MCP_TRANSPORT)",
     )
 
     args = parser.parse_args()
+
+    if not args.data_dir:
+        parser.error("--data-dir is required (or set MCP_DATA_DIR)")
 
     _data_dir = args.data_dir
     _mode = args.mode
