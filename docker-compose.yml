@@ -1,0 +1,19 @@
+services:
+  advanced-memory-mcp:
+    image: registry.confusticate.com/advanced-memory-mcp:latest
+    # build: .
+    ports:
+      - "8765:8765"
+    volumes:
+      - memory-data:/data
+      - ./tokens.json:/config/tokens.json:ro
+    environment:
+      - MCP_DATA_DIR=/data
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8765
+      - MCP_TOKEN_CONFIG=/config/tokens.json
+      - MCP_TRANSPORT=http
+    restart: unless-stopped
+
+volumes:
+  memory-data:
