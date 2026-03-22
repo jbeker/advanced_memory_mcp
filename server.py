@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from fastmcp import FastMCP, Context
+from fastmcp.server.dependencies import get_http_request
 
 from knowledge_graph import KnowledgeGraphManager
 from token_config import TokenConfig
@@ -14,12 +15,17 @@ _managers: dict[str, KnowledgeGraphManager] = {}
 
 
 def _get_token(ctx: Context) -> str:
-    """Extract bearer token from request context and validate against config."""
-    request = ctx.request_context
-    meta = getattr(request, "meta", None) or getattr(request, "_meta", None)
+    """Extract bearer token from HTTP Authorization header and validate against config."""
     token = None
-    if meta:
-        token = getattr(meta, "auth_token", None)
+
+    # Extract Bearer token from the HTTP Authorization header
+    try:
+        request = get_http_request()
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header[7:]
+    except RuntimeError:
+        pass
 
     # Fallback: check if there's a default token via environment
     if not token:
@@ -39,7 +45,7 @@ def get_graph_manager(token: str) -> KnowledgeGraphManager:
     """Get or create a KnowledgeGraphManager for the given token's data file."""
     entry = _token_config.get(token)
     if entry.file not in _managers:
-        file_path = os.path.join(_data_dir, f"{entry.file}.jsonl")
+        file_path = os.path.join(_data_dir, entry.file)
         _managers[entry.file] = KnowledgeGraphManager(file_path)
     return _managers[entry.file]
 
