@@ -199,7 +199,7 @@ def main():
 
     mcp = FastMCP("Advanced Memory MCP")
     register_tools(mcp)
-    mcp.run(transport=args.transport, host=args.host, port=args.port)
+    mcp.run(transport=args.transport, host=args.host, port=args.port, stateless_http=True)
 
 
 if __name__ == "__main__":
