@@ -1,6 +1,11 @@
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class KnowledgeGraphManager:
@@ -21,8 +26,12 @@ class KnowledgeGraphManager:
                 item = json.loads(line)
                 item_type = item.pop("type", None)
                 if item_type == "entity":
+                    item.setdefault("createdAt", None)
+                    item.setdefault("lastUpdated", None)
                     entities.append(item)
                 elif item_type == "relation":
+                    item.setdefault("createdAt", None)
+                    item.setdefault("lastUpdated", None)
                     relations.append(item)
 
         return {"entities": entities, "relations": relations}
@@ -40,7 +49,11 @@ class KnowledgeGraphManager:
     def create_entities(self, entities: list[dict]) -> list[dict]:
         graph = self.load_graph()
         existing_names = {e["name"] for e in graph["entities"]}
+        now = _now_iso()
         new_entities = [e for e in entities if e["name"] not in existing_names]
+        for entity in new_entities:
+            entity["createdAt"] = now
+            entity["lastUpdated"] = now
         graph["entities"].extend(new_entities)
         self.save_graph(graph)
         return new_entities
@@ -50,11 +63,15 @@ class KnowledgeGraphManager:
         existing = {
             (r["from"], r["to"], r["relationType"]) for r in graph["relations"]
         }
+        now = _now_iso()
         new_relations = [
             r
             for r in relations
             if (r["from"], r["to"], r["relationType"]) not in existing
         ]
+        for relation in new_relations:
+            relation["createdAt"] = now
+            relation["lastUpdated"] = now
         graph["relations"].extend(new_relations)
         self.save_graph(graph)
         return new_relations
@@ -75,6 +92,8 @@ class KnowledgeGraphManager:
             existing = set(entity.get("observations", []))
             new_obs = [o for o in obs["contents"] if o not in existing]
             entity.setdefault("observations", []).extend(new_obs)
+            if new_obs:
+                entity["lastUpdated"] = _now_iso()
             results.append({"entityName": entity_name, "addedObservations": new_obs})
 
         self.save_graph(graph)
@@ -103,9 +122,12 @@ class KnowledgeGraphManager:
                 continue
             entity = entity_map[entity_name]
             to_remove = set(deletion["observations"])
+            before_count = len(entity.get("observations", []))
             entity["observations"] = [
                 o for o in entity.get("observations", []) if o not in to_remove
             ]
+            if len(entity["observations"]) < before_count:
+                entity["lastUpdated"] = _now_iso()
 
         self.save_graph(graph)
 

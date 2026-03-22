@@ -63,7 +63,8 @@ def register_tools(mcp: FastMCP) -> None:
         """Create multiple new entities in the knowledge graph.
 
         Each entity should have 'name', 'entityType', and 'observations' fields.
-        Deduplicates by entity name - existing entities are skipped."""
+        Deduplicates by entity name - existing entities are skipped.
+        New entities receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps."""
         token = _get_token(ctx)
         _check_write_permission(token)
         manager = get_graph_manager(token)
@@ -75,7 +76,8 @@ def register_tools(mcp: FastMCP) -> None:
         """Create multiple new relations between entities.
 
         Each relation should have 'from', 'to', and 'relationType' fields.
-        Deduplicates by the (from, to, relationType) tuple."""
+        Deduplicates by the (from, to, relationType) tuple.
+        New relations receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps."""
         token = _get_token(ctx)
         _check_write_permission(token)
         manager = get_graph_manager(token)
@@ -134,7 +136,8 @@ def register_tools(mcp: FastMCP) -> None:
     def read_graph(ctx: Context) -> dict:
         """Read the entire knowledge graph.
 
-        Returns all entities and relations for the authenticated user."""
+        Returns all entities and relations for the authenticated user.
+        Entities include 'createdAt' and 'lastUpdated' timestamps (null for legacy data)."""
         token = _get_token(ctx)
         manager = get_graph_manager(token)
         return manager.read_graph()
@@ -144,7 +147,8 @@ def register_tools(mcp: FastMCP) -> None:
         """Search for nodes in the knowledge graph.
 
         Performs case-insensitive search across entity names, types, and observations.
-        Returns matching entities and any relations where at least one endpoint matches."""
+        Returns matching entities (with 'createdAt'/'lastUpdated' timestamps) and any
+        relations where at least one endpoint matches."""
         token = _get_token(ctx)
         manager = get_graph_manager(token)
         return manager.search_nodes(query)
@@ -153,8 +157,8 @@ def register_tools(mcp: FastMCP) -> None:
     def open_nodes(names: list[str], ctx: Context) -> dict:
         """Open specific nodes by name from the knowledge graph.
 
-        Returns the requested entities and any relations where at least one endpoint
-        is in the requested set."""
+        Returns the requested entities (with 'createdAt'/'lastUpdated' timestamps) and
+        any relations where at least one endpoint is in the requested set."""
         token = _get_token(ctx)
         manager = get_graph_manager(token)
         return manager.open_nodes(names)
