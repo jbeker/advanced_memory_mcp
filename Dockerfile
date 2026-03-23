@@ -14,6 +14,7 @@ ENV MCP_DATA_DIR=/data
 ENV MCP_HOST=0.0.0.0
 ENV MCP_PORT=8765
 ENV MCP_TOKEN_CONFIG=/config/tokens.json
+ENV MCP_TYPE_CONFIG=/config/entity_types.json
 ENV MCP_TRANSPORT=http
 
 VOLUME /data

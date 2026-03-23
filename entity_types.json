@@ -1,0 +1,18 @@
+{
+  "aliases": {
+    "person": "Person",
+    "colleague": "Person",
+    "employee": "Person",
+    "team member": "Person",
+    "1password employee": "Person",
+    "project": "Project",
+    "work project": "Project",
+    "meeting": "Meeting",
+    "team": "Team",
+    "work team": "Team",
+    "workteam": "Team",
+    "organization": "Organization",
+    "company": "Organization",
+    "org": "Organization"
+  }
+}

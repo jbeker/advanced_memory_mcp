@@ -1,5 +1,7 @@
 import argparse
+import json
 import os
+import tomllib
 from pathlib import Path
 
 from fastmcp import FastMCP, Context
@@ -11,6 +13,7 @@ from token_config import TokenConfig
 # Global state
 _data_dir: str = ""
 _token_config: TokenConfig | None = None
+_type_aliases: dict[str, str] = {}
 _managers: dict[str, KnowledgeGraphManager] = {}
 
 
@@ -46,7 +49,7 @@ def get_graph_manager(token: str) -> KnowledgeGraphManager:
     entry = _token_config.get(token)
     if entry.file not in _managers:
         file_path = os.path.join(_data_dir, entry.file)
-        _managers[entry.file] = KnowledgeGraphManager(file_path)
+        _managers[entry.file] = KnowledgeGraphManager(file_path, type_aliases=_type_aliases)
     return _managers[entry.file]
 
 
@@ -163,9 +166,20 @@ def register_tools(mcp: FastMCP) -> None:
         manager = get_graph_manager(token)
         return manager.open_nodes(names)
 
+    @mcp.tool()
+    def normalize_entity_types(ctx: Context) -> dict:
+        """Normalize all entity types in the knowledge graph using configured aliases.
+
+        Applies type alias mappings and Title Case normalization to all existing entities.
+        Returns a summary of changes made. Read-only tokens are rejected."""
+        token = _get_token(ctx)
+        _check_write_permission(token)
+        manager = get_graph_manager(token)
+        return manager.normalize_all_entity_types()
+
 
 def main():
-    global _data_dir, _token_config
+    global _data_dir, _token_config, _type_aliases
 
     parser = argparse.ArgumentParser(description="Advanced Memory MCP Server")
     parser.add_argument("--host", default=os.environ.get("MCP_HOST", "0.0.0.0"), help="Host to bind to (default: 0.0.0.0, env: MCP_HOST)")
@@ -175,6 +189,11 @@ def main():
         "--token-config",
         default=os.environ.get("MCP_TOKEN_CONFIG"),
         help="Path to tokens.json config file (env: MCP_TOKEN_CONFIG)",
+    )
+    parser.add_argument(
+        "--type-config",
+        default=os.environ.get("MCP_TYPE_CONFIG"),
+        help="Path to entity_types.json config file (env: MCP_TYPE_CONFIG)",
     )
     parser.add_argument(
         "--transport",
@@ -194,8 +213,26 @@ def main():
     _data_dir = args.data_dir
     _token_config = TokenConfig(args.token_config)
 
+    if args.type_config:
+        type_config_path = Path(args.type_config)
+        if type_config_path.exists():
+            with open(type_config_path) as f:
+                type_config = json.load(f)
+            _type_aliases = type_config.get("aliases", {})
+
     # Ensure data directory exists
     Path(_data_dir).mkdir(parents=True, exist_ok=True)
+
+    _pyproject = Path(__file__).parent / "pyproject.toml"
+    with open(_pyproject, "rb") as f:
+        server_version = tomllib.load(f)["project"]["version"]
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    log = logging.getLogger("advanced-memory-mcp")
+    log.info(f"Advanced Memory MCP v{server_version}")
+    log.info(f"Transport: {args.transport} | Host: {args.host} | Port: {args.port}")
+    log.info(f"Data dir: {_data_dir}")
+    log.info(f"Type aliases loaded: {len(_type_aliases)}")
 
     mcp = FastMCP("Advanced Memory MCP")
     register_tools(mcp)

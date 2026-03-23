@@ -7,11 +7,13 @@ services:
     volumes:
       - memory-data:/data
       - ./tokens.json:/config/tokens.json:ro
+      - ./entity_types.json:/config/entity_types.json:ro
     environment:
       - MCP_DATA_DIR=/data
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8765
       - MCP_TOKEN_CONFIG=/config/tokens.json
+      - MCP_TYPE_CONFIG=/config/entity_types.json
       - MCP_TRANSPORT=http
     restart: unless-stopped
 

@@ -1,6 +1,6 @@
 [project]
 name = "advanced-memory-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-user MCP memory server with SSE/streamable HTTP support"
 requires-python = ">=3.11"
 dependencies = [

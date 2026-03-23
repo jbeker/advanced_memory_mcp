@@ -8,9 +8,20 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def normalize_entity_type(entity_type: str, aliases: dict[str, str]) -> str:
+    """Normalize an entity type using aliases, falling back to Title Case."""
+    if not entity_type:
+        return entity_type
+    canonical = aliases.get(entity_type.lower())
+    if canonical:
+        return canonical
+    return entity_type.title()
+
+
 class KnowledgeGraphManager:
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, type_aliases: dict[str, str] | None = None):
         self.file_path = Path(file_path)
+        self._type_aliases = type_aliases or {}
 
     def load_graph(self) -> dict:
         if not self.file_path.exists() or self.file_path.stat().st_size == 0:
@@ -52,6 +63,9 @@ class KnowledgeGraphManager:
         now = _now_iso()
         new_entities = [e for e in entities if e["name"] not in existing_names]
         for entity in new_entities:
+            entity["entityType"] = normalize_entity_type(
+                entity.get("entityType", ""), self._type_aliases
+            )
             entity["createdAt"] = now
             entity["lastUpdated"] = now
         graph["entities"].extend(new_entities)
@@ -172,6 +186,21 @@ class KnowledgeGraphManager:
         ]
 
         return {"entities": matching_entities, "relations": matching_relations}
+
+    def normalize_all_entity_types(self) -> dict:
+        graph = self.load_graph()
+        changes = []
+        now = _now_iso()
+        for entity in graph["entities"]:
+            old_type = entity.get("entityType", "")
+            new_type = normalize_entity_type(old_type, self._type_aliases)
+            if old_type != new_type:
+                changes.append({"name": entity["name"], "oldType": old_type, "newType": new_type})
+                entity["entityType"] = new_type
+                entity["lastUpdated"] = now
+        if changes:
+            self.save_graph(graph)
+        return {"changes": changes, "total": len(changes)}
 
     def open_nodes(self, names: list[str]) -> dict:
         graph = self.load_graph()
