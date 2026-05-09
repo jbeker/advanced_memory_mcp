@@ -138,6 +138,35 @@ def register_tools(mcp: FastMCP) -> None:
         return {"deleted": relations}
 
     @mcp.tool()
+    def rename_entity(name: str, new_name: str, ctx: Context) -> dict:
+        """Rename an entity in the knowledge graph.
+
+        Updates the entity's name and rewrites every relation that references it
+        (both 'from' and 'to' endpoints). Errors if the source entity is not found,
+        if an entity with 'new_name' already exists (use merge_entities to combine
+        them), or if name == new_name. Bumps lastUpdated on the entity and on every
+        touched relation."""
+        token = _get_token(ctx)
+        _check_write_permission(token)
+        manager = get_graph_manager(token)
+        return manager.rename_entity(name, new_name)
+
+    @mcp.tool()
+    def merge_entities(source: str, target: str, ctx: Context) -> dict:
+        """Merge the source entity into the target entity.
+
+        The source is removed; the target absorbs the source's observations
+        (unioned, target order preserved) and relations (re-pointed, self-loops
+        dropped, duplicates collapsed keeping the earliest createdAt). Target's
+        entityType is kept; if source's entityType differed it is returned as
+        'discardedType' in the response. createdAt becomes the earliest non-null
+        of the two. Errors if either entity is missing or source == target."""
+        token = _get_token(ctx)
+        _check_write_permission(token)
+        manager = get_graph_manager(token)
+        return manager.merge_entities(source, target)
+
+    @mcp.tool()
     def read_graph(ctx: Context) -> dict:
         """Read the entire knowledge graph.
 
