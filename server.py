@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import secrets
 import tomllib
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from fastmcp.server.dependencies import get_http_request
 
 from knowledge_graph import KnowledgeGraphManager
 from token_config import TokenConfig
+from webui import register_routes as register_webui_routes
 
 # Global state
 _data_dir: str = ""
@@ -234,8 +236,23 @@ def main():
     log.info(f"Data dir: {_data_dir}")
     log.info(f"Type aliases loaded: {len(_type_aliases)}")
 
+    ui_secret = os.environ.get("MEMORY_UI_SECRET")
+    if not ui_secret:
+        ui_secret = secrets.token_urlsafe(32)
+        log.warning(
+            "MEMORY_UI_SECRET not set; using ephemeral secret. "
+            "UI sessions will be invalidated when the server restarts."
+        )
+
     mcp = FastMCP("Advanced Memory MCP")
     register_tools(mcp)
+    register_webui_routes(
+        mcp,
+        token_config=_token_config,
+        get_manager=get_graph_manager,
+        ui_secret=ui_secret,
+    )
+    log.info("Web UI available at /ui/")
     mcp.run(transport=args.transport, host=args.host, port=args.port, stateless_http=True)
 
 

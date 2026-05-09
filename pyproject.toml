@@ -5,6 +5,15 @@ description = "Multi-user MCP memory server with SSE/streamable HTTP support"
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp",
+    "jinja2",
+    "itsdangerous",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
 ]
 
 [project.scripts]
@@ -15,4 +24,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["server.py", "knowledge_graph.py", "token_config.py"]
+only-include = ["server.py", "knowledge_graph.py", "token_config.py", "webui"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

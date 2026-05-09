@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Entities &middot; Memory MCP{% endblock %}
+{% block topbar %}
+<div class="topbar-right">
+  <span class="user-chip">{{ user_label }}{% if read_only %} &middot; read-only{% endif %}</span>
+  <form method="post" action="/ui/logout" class="inline">
+    <button type="submit" class="link">Sign out</button>
+  </form>
+</div>
+{% endblock %}
+{% block content %}
+<section class="entity-list">
+  <header class="list-header">
+    <h1>Entities <span class="count">({{ entities|length }})</span></h1>
+    <div class="filters">
+      <input
+        type="search"
+        name="q"
+        placeholder="Search names, types, observations\u2026"
+        autocomplete="off"
+        hx-get="/ui/search"
+        hx-trigger="input changed delay:300ms, search"
+        hx-target="#entity-rows"
+        hx-include="closest .filters"
+      >
+      <select
+        name="type"
+        hx-get="/ui/search"
+        hx-trigger="change"
+        hx-target="#entity-rows"
+        hx-include="closest .filters"
+      >
+        <option value="">All types</option>
+        {% for t in distinct_types %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </header>
+  <table class="entities">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th class="num">Observations</th>
+        <th>Last updated</th>
+      </tr>
+    </thead>
+    <tbody id="entity-rows">
+      {% include "entity_list_rows.html" %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

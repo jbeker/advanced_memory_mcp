@@ -1,0 +1,14 @@
+<li class="obs">
+  <span class="obs-text">{{ obs }}</span>
+  {% if not read_only %}
+  <span class="obs-actions">
+    <button class="link"
+            hx-post="/ui/api/observations/delete"
+            hx-vals='{"entity": "{{ entity.name|e }}", "text": {{ obs|tojson }}}'
+            hx-confirm="Delete this observation?"
+            hx-target="closest li"
+            hx-swap="outerHTML"
+    >delete</button>
+  </span>
+  {% endif %}
+</li>

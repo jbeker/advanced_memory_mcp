@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Graph &middot; Memory MCP{% endblock %}
+{% block topbar %}
+<div class="topbar-right">
+  <span class="user-chip">{{ user_label }}{% if read_only %} &middot; read-only{% endif %}</span>
+  <a class="link" href="/ui/">All entities</a>
+  <form method="post" action="/ui/logout" class="inline">
+    <button type="submit" class="link">Sign out</button>
+  </form>
+</div>
+{% endblock %}
+{% block content %}
+<section class="graph">
+  <header class="detail-header">
+    <h1>
+      {% if center %}Neighborhood of <a href="/ui/entity/{{ center|urlencode }}">{{ center }}</a>{% else %}Full graph{% endif %}
+    </h1>
+    <p class="muted">
+      {% if center %}Depth {{ depth }}{% else %}{{ entity_count }} entities, {{ relation_count }} relations{% endif %}
+    </p>
+  </header>
+
+  {% if warn_large %}
+  <div class="warning">
+    <p>
+      <strong>Large graph warning:</strong> rendering {{ entity_count }} nodes
+      may be slow. The default threshold is 500.
+    </p>
+    <p>
+      <a class="button" href="/ui/graph?all=1&confirm=1">Render anyway</a>
+    </p>
+  </div>
+  {% else %}
+  <div id="cy" class="cy"></div>
+  <script src="/ui/static/cytoscape.min.js"></script>
+  <script>
+    fetch("/ui/api/graph?{{ api_query|safe }}")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var elements = data.nodes.concat(data.edges);
+        var cy = cytoscape({
+          container: document.getElementById("cy"),
+          elements: elements,
+          layout: { name: "cose", animate: false },
+          style: [
+            { selector: "node", style: {
+              "label": "data(id)",
+              "background-color": "#4f8cff",
+              "color": "#fff",
+              "text-outline-color": "#1a3a8a",
+              "text-outline-width": 2,
+              "font-size": 11
+            } },
+            { selector: "edge", style: {
+              "label": "data(label)",
+              "curve-style": "bezier",
+              "target-arrow-shape": "triangle",
+              "line-color": "#888",
+              "target-arrow-color": "#888",
+              "font-size": 9,
+              "color": "#555"
+            } }
+          ]
+        });
+        cy.on("tap", "node", function (e) {
+          window.location.href = "/ui/entity/" + encodeURIComponent(e.target.id());
+        });
+      });
+  </script>
+  {% endif %}
+</section>
+{% endblock %}

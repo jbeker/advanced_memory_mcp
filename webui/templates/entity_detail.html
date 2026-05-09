@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ entity.name }} &middot; Memory MCP{% endblock %}
+{% block topbar %}
+<div class="topbar-right">
+  <span class="user-chip">{{ user_label }}{% if read_only %} &middot; read-only{% endif %}</span>
+  <a class="link" href="/ui/">All entities</a>
+  <a class="link" href="/ui/graph?center={{ entity.name|urlencode }}&depth=2">View graph</a>
+  <form method="post" action="/ui/logout" class="inline">
+    <button type="submit" class="link">Sign out</button>
+  </form>
+</div>
+{% endblock %}
+{% block content %}
+<section class="entity-detail">
+  <header class="detail-header">
+    <h1>{{ entity.name }}</h1>
+    <p class="meta">
+      <span class="type-pill">{{ entity.entityType }}</span>
+      {% if entity.createdAt %}<span class="muted">created {{ entity.createdAt }}</span>{% endif %}
+      {% if entity.lastUpdated %}<span class="muted">updated {{ entity.lastUpdated }}</span>{% endif %}
+    </p>
+    {% if not read_only %}
+    <button
+      class="danger"
+      hx-delete="/ui/api/entities/{{ entity.name|urlencode }}"
+      hx-confirm="Delete {{ entity.name }} and all its relations?"
+    >Delete entity</button>
+    {% endif %}
+  </header>
+
+  <h2>Observations <span class="count">({{ entity.observations|length }})</span></h2>
+  {% if entity.observations %}
+  <ul class="observations" id="observations">
+    {% for obs in entity.observations %}
+    {% include "observation_row.html" %}
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No observations.</p>
+  {% endif %}
+
+  <h2>Relations</h2>
+  <div class="relations">
+    <section>
+      <h3>Outgoing <span class="count">({{ outgoing|length }})</span></h3>
+      {% if outgoing %}
+      <ul>
+        {% for r in outgoing %}
+        <li>
+          <span class="rel-type">{{ r.relationType }}</span>
+          &rarr;
+          <a href="/ui/entity/{{ r.to|urlencode }}">{{ r.to }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty">None.</p>{% endif %}
+    </section>
+    <section>
+      <h3>Incoming <span class="count">({{ incoming|length }})</span></h3>
+      {% if incoming %}
+      <ul>
+        {% for r in incoming %}
+        <li>
+          <a href="/ui/entity/{{ r['from']|urlencode }}">{{ r['from'] }}</a>
+          <span class="rel-type">{{ r.relationType }}</span>
+          &rarr; here
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty">None.</p>{% endif %}
+    </section>
+  </div>
+</section>
+{% endblock %}

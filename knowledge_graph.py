@@ -126,6 +126,30 @@ class KnowledgeGraphManager:
         ]
         self.save_graph(graph)
 
+    def update_observation(
+        self, entity_name: str, original_text: str, new_text: str
+    ) -> bool:
+        """Replace the first observation matching original_text in place.
+
+        Preserves observation order and updates lastUpdated. Returns True on a
+        successful replace, False if the entity or original text isn't found.
+        Used by the web UI's edit-observation flow.
+        """
+        graph = self.load_graph()
+        for entity in graph["entities"]:
+            if entity["name"] != entity_name:
+                continue
+            obs_list = entity.get("observations", [])
+            for i, existing in enumerate(obs_list):
+                if existing == original_text:
+                    obs_list[i] = new_text
+                    entity["observations"] = obs_list
+                    entity["lastUpdated"] = _now_iso()
+                    self.save_graph(graph)
+                    return True
+            return False
+        return False
+
     def delete_observations(self, deletions: list[dict]) -> None:
         graph = self.load_graph()
         entity_map = {e["name"]: e for e in graph["entities"]}
