@@ -8,6 +8,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY server.py knowledge_graph.py token_config.py ./
+COPY webui ./webui
 RUN uv sync --frozen --no-dev
 
 ENV MCP_DATA_DIR=/data
