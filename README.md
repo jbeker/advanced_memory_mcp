@@ -125,6 +125,8 @@ Optional alias mappings for entity type normalization. When an entity is created
 | `delete_entities` | Delete entities and cascade-delete their relations. |
 | `delete_observations` | Remove specific observations from entities. |
 | `delete_relations` | Remove specific relations by exact match. |
+| `rename_entity` | Rename an entity and rewrite every relation that references it. Errors on target collision. |
+| `merge_entities` | Merge a source entity into a target: union observations, re-point relations, drop self-loops and duplicates. |
 | `normalize_entity_types` | Apply type alias mappings to all existing entities. |
 
 ### Read Operations (all tokens)
