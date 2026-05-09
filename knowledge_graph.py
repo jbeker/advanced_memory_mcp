@@ -171,6 +171,103 @@ class KnowledgeGraphManager:
             "relationsUpdated": relations_updated,
         }
 
+    def merge_entities(self, source: str, target: str) -> dict:
+        """Merge source entity into target, removing source.
+
+        Target keeps its name and entityType. Observations are unioned (target
+        order preserved). Relations involving source are re-pointed to target;
+        resulting self-loops are dropped, and surviving duplicates collapse on
+        (from, to, relationType), keeping the earliest non-null createdAt.
+        Errors on self-merge or missing entities.
+        """
+        if source == target:
+            raise ValueError("cannot merge an entity with itself")
+
+        graph = self.load_graph()
+        entity_map = {e["name"]: e for e in graph["entities"]}
+
+        if source not in entity_map:
+            raise ValueError(f"Entity '{source}' not found")
+        if target not in entity_map:
+            raise ValueError(f"Entity '{target}' not found")
+
+        src = entity_map[source]
+        tgt = entity_map[target]
+        now = _now_iso()
+
+        # Observations: union, target order preserved.
+        existing_obs = set(tgt.get("observations", []))
+        new_obs = [o for o in src.get("observations", []) if o not in existing_obs]
+        tgt.setdefault("observations", []).extend(new_obs)
+        observations_added = len(new_obs)
+
+        # entityType: target wins; report source's if it differs.
+        discarded_type = None
+        src_type = src.get("entityType")
+        tgt_type = tgt.get("entityType")
+        if src_type and src_type != tgt_type:
+            discarded_type = src_type
+
+        # createdAt: earliest non-null. Both null -> stay null.
+        src_created = src.get("createdAt")
+        tgt_created = tgt.get("createdAt")
+        if src_created and tgt_created:
+            tgt["createdAt"] = min(src_created, tgt_created)
+        elif src_created and not tgt_created:
+            tgt["createdAt"] = src_created
+        # else: keep tgt_created (possibly null).
+
+        tgt["lastUpdated"] = now
+
+        # Re-point every relation involving source.
+        relations_re_pointed = 0
+        for r in graph["relations"]:
+            touched = False
+            if r["from"] == source:
+                r["from"] = target
+                touched = True
+            if r["to"] == source:
+                r["to"] = target
+                touched = True
+            if touched:
+                relations_re_pointed += 1
+
+        # Drop self-loops created by re-pointing.
+        before_loops = len(graph["relations"])
+        graph["relations"] = [r for r in graph["relations"] if r["from"] != r["to"]]
+        self_dropped = before_loops - len(graph["relations"])
+
+        # Dedupe by (from, to, relationType); keep earliest non-null createdAt.
+        seen: dict[tuple, dict] = {}
+        for r in graph["relations"]:
+            key = (r["from"], r["to"], r["relationType"])
+            if key not in seen:
+                seen[key] = r
+                continue
+            existing = seen[key]
+            ec = existing.get("createdAt")
+            rc = r.get("createdAt")
+            # Replace if r's createdAt is non-null and earlier (or existing is null).
+            if rc and (not ec or rc < ec):
+                seen[key] = r
+        deduped = list(seen.values())
+        dup_dropped = len(graph["relations"]) - len(deduped)
+        graph["relations"] = deduped
+
+        relations_dropped = self_dropped + dup_dropped
+
+        # Remove the source entity.
+        graph["entities"] = [e for e in graph["entities"] if e["name"] != source]
+
+        self.save_graph(graph)
+        return {
+            "merged": {"source": source, "target": target},
+            "observationsAdded": observations_added,
+            "relationsRePointed": relations_re_pointed,
+            "relationsDropped": relations_dropped,
+            "discardedType": discarded_type,
+        }
+
     def update_observation(
         self, entity_name: str, original_text: str, new_text: str
     ) -> bool:
