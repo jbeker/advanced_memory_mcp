@@ -342,3 +342,67 @@ def test_merge_entities_errors_when_source_missing(manager: KnowledgeGraphManage
 def test_merge_entities_errors_when_target_missing(manager: KnowledgeGraphManager):
     with pytest.raises(ValueError, match="not found"):
         manager.merge_entities("Alice", "Nobody")
+
+
+@pytest.mark.parametrize("source,target", [("", "Alice"), ("Alice", "")])
+def test_merge_entities_errors_on_empty_string_inputs(
+    manager: KnowledgeGraphManager, source: str, target: str
+):
+    with pytest.raises(ValueError):
+        manager.merge_entities(source, target)
+
+
+def test_merge_entities_discardedType_set_when_target_type_missing(tmp_path: Path):
+    file_path = tmp_path / "kg.jsonl"
+    items = [
+        {"type": "entity", "name": "Source", "entityType": "Person", "observations": [],
+         "createdAt": "2026-01-01T00:00:00+00:00", "lastUpdated": "2026-01-01T00:00:00+00:00"},
+        # Legacy target with no entityType field at all.
+        {"type": "entity", "name": "Target", "observations": [],
+         "createdAt": "2026-01-01T00:00:00+00:00", "lastUpdated": "2026-01-01T00:00:00+00:00"},
+    ]
+    _write_jsonl(file_path, items)
+    mgr = KnowledgeGraphManager(str(file_path))
+
+    result = mgr.merge_entities("Source", "Target")
+    assert result["discardedType"] == "Person"
+
+
+def test_merge_entities_preserves_source_only_relation_to_third_entity(tmp_path: Path):
+    file_path = tmp_path / "kg.jsonl"
+    items = [
+        {"type": "entity", "name": "Source", "entityType": "Person", "observations": [],
+         "createdAt": "2026-01-01T00:00:00+00:00", "lastUpdated": "2026-01-01T00:00:00+00:00"},
+        {"type": "entity", "name": "Target", "entityType": "Person", "observations": [],
+         "createdAt": "2026-01-01T00:00:00+00:00", "lastUpdated": "2026-01-01T00:00:00+00:00"},
+        {"type": "entity", "name": "Third", "entityType": "Project", "observations": [],
+         "createdAt": "2026-01-01T00:00:00+00:00", "lastUpdated": "2026-01-01T00:00:00+00:00"},
+        # Source has a relation to Third; Target does not.
+        {"type": "relation", "from": "Source", "to": "Third", "relationType": "depends_on",
+         "createdAt": "2026-02-01T00:00:00+00:00", "lastUpdated": "2026-02-01T00:00:00+00:00"},
+    ]
+    _write_jsonl(file_path, items)
+    mgr = KnowledgeGraphManager(str(file_path))
+
+    mgr.merge_entities("Source", "Target")
+
+    relations = mgr.read_graph()["relations"]
+    assert len(relations) == 1
+    r = relations[0]
+    assert r["from"] == "Target"
+    assert r["to"] == "Third"
+    assert r["relationType"] == "depends_on"
+    # createdAt of the original relation is preserved (re-pointing doesn't bump it).
+    assert r["createdAt"] == "2026-02-01T00:00:00+00:00"
+
+
+def test_merge_entities_bumps_target_lastUpdated(manager: KnowledgeGraphManager):
+    before = next(e for e in manager.read_graph()["entities"] if e["name"] == "Alice")
+    before_updated = before["lastUpdated"]
+
+    manager.merge_entities("Bob", "Alice")
+
+    after = next(e for e in manager.read_graph()["entities"] if e["name"] == "Alice")
+    assert after["lastUpdated"] != before_updated
+    # createdAt is the earliest non-null - both Alice and Bob had the same value here.
+    assert after["createdAt"] == before["createdAt"]

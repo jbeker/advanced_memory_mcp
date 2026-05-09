@@ -180,6 +180,8 @@ class KnowledgeGraphManager:
         (from, to, relationType), keeping the earliest non-null createdAt.
         Errors on self-merge or missing entities.
         """
+        if not source or not target:
+            raise ValueError("source and target must both be non-empty")
         if source == target:
             raise ValueError("cannot merge an entity with itself")
 
