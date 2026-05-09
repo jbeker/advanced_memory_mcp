@@ -145,7 +145,7 @@ def register_tools(mcp: FastMCP) -> None:
         (both 'from' and 'to' endpoints). Errors if the source entity is not found,
         if an entity with 'new_name' already exists (use merge_entities to combine
         them), or if name == new_name. Bumps lastUpdated on the entity and on every
-        touched relation."""
+        touched relation. Returns {renamed: {from, to}, relationsUpdated: N}."""
         token = _get_token(ctx)
         _check_write_permission(token)
         manager = get_graph_manager(token)
