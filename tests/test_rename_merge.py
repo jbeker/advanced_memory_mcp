@@ -162,8 +162,18 @@ def test_rename_entity_errors_on_self_rename(manager: KnowledgeGraphManager):
         manager.rename_entity("Alice", "Alice")
 
 
-def test_rename_entity_errors_on_empty_strings(manager: KnowledgeGraphManager):
+@pytest.mark.parametrize("name,new_name", [("", "Bob"), ("Alice", "")])
+def test_rename_entity_errors_on_empty_string_inputs(
+    manager: KnowledgeGraphManager, name: str, new_name: str
+):
     with pytest.raises(ValueError):
-        manager.rename_entity("", "Bob")
+        manager.rename_entity(name, new_name)
+
+
+def test_rename_entity_does_not_write_on_validation_failure(
+    manager: KnowledgeGraphManager,
+):
+    mtime_before = manager.file_path.stat().st_mtime_ns
     with pytest.raises(ValueError):
-        manager.rename_entity("Alice", "")
+        manager.rename_entity("Nobody", "Somebody")
+    assert manager.file_path.stat().st_mtime_ns == mtime_before
