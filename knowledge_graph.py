@@ -126,6 +126,51 @@ class KnowledgeGraphManager:
         ]
         self.save_graph(graph)
 
+    def rename_entity(self, name: str, new_name: str) -> dict:
+        """Rename an entity and rewrite every relation that references it.
+
+        Errors if the source is missing or the target name already exists.
+        Use merge_entities to combine two existing entities.
+        """
+        if not name or not new_name:
+            raise ValueError("name and new_name must both be non-empty")
+        if name == new_name:
+            raise ValueError("rename is a no-op")
+
+        graph = self.load_graph()
+        entity_map = {e["name"]: e for e in graph["entities"]}
+
+        if name not in entity_map:
+            raise ValueError(f"Entity '{name}' not found")
+        if new_name in entity_map:
+            raise ValueError(
+                f"Entity '{new_name}' already exists; use merge_entities to combine them"
+            )
+
+        now = _now_iso()
+        entity = entity_map[name]
+        entity["name"] = new_name
+        entity["lastUpdated"] = now
+
+        relations_updated = 0
+        for r in graph["relations"]:
+            touched = False
+            if r["from"] == name:
+                r["from"] = new_name
+                touched = True
+            if r["to"] == name:
+                r["to"] = new_name
+                touched = True
+            if touched:
+                r["lastUpdated"] = now
+                relations_updated += 1
+
+        self.save_graph(graph)
+        return {
+            "renamed": {"from": name, "to": new_name},
+            "relationsUpdated": relations_updated,
+        }
+
     def update_observation(
         self, entity_name: str, original_text: str, new_text: str
     ) -> bool:
