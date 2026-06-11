@@ -1,0 +1,374 @@
+{
+  "meta": null,
+  "nextCursor": null,
+  "tools": [
+    {
+      "name": "create_entities",
+      "title": null,
+      "description": "Create multiple new entities in the knowledge graph.\n\nEach entity should have 'name', 'entityType', and 'observations' fields.\nDeduplicates by entity name - existing entities are skipped.\nNew entities receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "entities": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entities"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "create_relations",
+      "title": null,
+      "description": "Create multiple new relations between entities.\n\nEach relation should have 'from', 'to', and 'relationType' fields.\nDeduplicates by the (from, to, relationType) tuple.\nNew relations receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "relations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "add_observations",
+      "title": null,
+      "description": "Add new observations to existing entities.\n\nEach observation should have 'entityName' and 'contents' (list of strings).\nReturns error if entity doesn't exist. Deduplicates observations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "observations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "observations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "delete_entities",
+      "title": null,
+      "description": "Delete entities and their associated relations from the knowledge graph.\n\nTakes a list of entity names to delete. Relations involving deleted entities\nare also removed (cascade delete).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "entityNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entityNames"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "delete_observations",
+      "title": null,
+      "description": "Delete specific observations from entities.\n\nEach deletion should have 'entityName' and 'observations' (list of strings to remove).\nSilently ignores missing entities or observations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "deletions"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "delete_relations",
+      "title": null,
+      "description": "Delete specific relations from the knowledge graph.\n\nEach relation should have 'from', 'to', and 'relationType' fields.\nAll three fields must match for deletion.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "relations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "rename_entity",
+      "title": null,
+      "description": "Rename an entity in the knowledge graph.\n\nUpdates the entity's name and rewrites every relation that references it\n(both 'from' and 'to' endpoints). Errors if the source entity is not found,\nif an entity with 'new_name' already exists (use merge_entities to combine\nthem), or if name == new_name. Bumps lastUpdated on the entity and on every\ntouched relation. Returns {renamed: {from, to}, relationsUpdated: N}.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "new_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "new_name"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "merge_entities",
+      "title": null,
+      "description": "Merge the source entity into the target entity.\n\nThe source is removed; the target absorbs the source's observations\n(unioned, target order preserved) and relations (re-pointed, self-loops\ndropped, duplicates collapsed keeping the earliest createdAt). Target's\nentityType is kept; if source's entityType differed it is returned as\n'discardedType' in the response. createdAt becomes the earliest non-null\nof the two. Errors if either entity is missing or source == target.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "read_graph",
+      "title": null,
+      "description": "Read the entire knowledge graph.\n\nReturns all entities and relations for the authenticated user.\nEntities include 'createdAt' and 'lastUpdated' timestamps (null for legacy data).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "search_nodes",
+      "title": null,
+      "description": "Search for nodes in the knowledge graph.\n\nPerforms case-insensitive search across entity names, types, and observations.\nReturns matching entities (with 'createdAt'/'lastUpdated' timestamps) and any\nrelations where at least one endpoint matches.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "open_nodes",
+      "title": null,
+      "description": "Open specific nodes by name from the knowledge graph.\n\nReturns the requested entities (with 'createdAt'/'lastUpdated' timestamps) and\nany relations where at least one endpoint is in the requested set.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    },
+    {
+      "name": "normalize_entity_types",
+      "title": null,
+      "description": "Normalize all entity types in the knowledge graph using configured aliases.\n\nApplies type alias mappings and Title Case normalization to all existing entities.\nReturns a summary of changes made. Read-only tokens are rejected.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": {
+        "fastmcp": {
+          "tags": []
+        }
+      },
+      "execution": null
+    }
+  ]
+}

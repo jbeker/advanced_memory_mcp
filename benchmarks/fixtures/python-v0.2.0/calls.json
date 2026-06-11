@@ -1,0 +1,893 @@
+[
+  {
+    "label": "create_entities_success",
+    "tool": "create_entities",
+    "args": {
+      "entities": [
+        {
+          "name": "Alice",
+          "entityType": "person",
+          "observations": [
+            "Likes coffee"
+          ]
+        },
+        {
+          "name": "Project X",
+          "entityType": "work project",
+          "observations": []
+        },
+        {
+          "name": "Widget",
+          "entityType": "weird gadget thing",
+          "observations": [
+            "Title-case fallback test"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"created\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Likes coffee\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"},{\"name\":\"Project X\",\"entityType\":\"Project\",\"observations\":[],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"},{\"name\":\"Widget\",\"entityType\":\"Weird Gadget Thing\",\"observations\":[\"Title-case fallback test\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "created": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Likes coffee"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          },
+          {
+            "name": "Project X",
+            "entityType": "Project",
+            "observations": [],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          },
+          {
+            "name": "Widget",
+            "entityType": "Weird Gadget Thing",
+            "observations": [
+              "Title-case fallback test"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "create_entities_dedup",
+    "tool": "create_entities",
+    "args": {
+      "entities": [
+        {
+          "name": "Alice",
+          "entityType": "person",
+          "observations": [
+            "dup, should be skipped"
+          ]
+        },
+        {
+          "name": "Bob",
+          "entityType": "colleague",
+          "observations": [
+            "New colleague"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"created\":[{\"name\":\"Bob\",\"entityType\":\"Person\",\"observations\":[\"New colleague\"],\"createdAt\":\"2026-06-11T16:47:19.692026+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.692026+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "created": [
+          {
+            "name": "Bob",
+            "entityType": "Person",
+            "observations": [
+              "New colleague"
+            ],
+            "createdAt": "2026-06-11T16:47:19.692026+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.692026+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "create_relations_success",
+    "tool": "create_relations",
+    "args": {
+      "relations": [
+        {
+          "from": "Alice",
+          "to": "Project X",
+          "relationType": "worksOn"
+        },
+        {
+          "from": "Bob",
+          "to": "Project X",
+          "relationType": "worksOn"
+        },
+        {
+          "from": "Alice",
+          "to": "Bob",
+          "relationType": "manages"
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"created\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Bob\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Alice\",\"to\":\"Bob\",\"relationType\":\"manages\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "created": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Bob",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Alice",
+            "to": "Bob",
+            "relationType": "manages",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "create_relations_dedup",
+    "tool": "create_relations",
+    "args": {
+      "relations": [
+        {
+          "from": "Alice",
+          "to": "Project X",
+          "relationType": "worksOn"
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"created\":[]}"
+        }
+      ],
+      "structuredContent": {
+        "created": []
+      }
+    }
+  },
+  {
+    "label": "add_observations_success",
+    "tool": "add_observations",
+    "args": {
+      "observations": [
+        {
+          "entityName": "Alice",
+          "contents": [
+            "Lives in Boston",
+            "Likes coffee"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"results\":[{\"entityName\":\"Alice\",\"addedObservations\":[\"Lives in Boston\"]}]}"
+        }
+      ],
+      "structuredContent": {
+        "results": [
+          {
+            "entityName": "Alice",
+            "addedObservations": [
+              "Lives in Boston"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "add_observations_missing_entity",
+    "tool": "add_observations",
+    "args": {
+      "observations": [
+        {
+          "entityName": "Nobody",
+          "contents": [
+            "x"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'add_observations': Entity 'Nobody' not found"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "search_nodes",
+    "tool": "search_nodes",
+    "args": {
+      "query": "alice"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Likes coffee\",\"Lives in Boston\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.743248+00:00\"}],\"relations\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Alice\",\"to\":\"Bob\",\"relationType\":\"manages\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Likes coffee",
+              "Lives in Boston"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.743248+00:00"
+          }
+        ],
+        "relations": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Alice",
+            "to": "Bob",
+            "relationType": "manages",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "search_nodes_by_observation",
+    "tool": "search_nodes",
+    "args": {
+      "query": "boston"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Likes coffee\",\"Lives in Boston\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.743248+00:00\"}],\"relations\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Alice\",\"to\":\"Bob\",\"relationType\":\"manages\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Likes coffee",
+              "Lives in Boston"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.743248+00:00"
+          }
+        ],
+        "relations": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Alice",
+            "to": "Bob",
+            "relationType": "manages",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "search_nodes_no_match",
+    "tool": "search_nodes",
+    "args": {
+      "query": "zzz-nothing"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[],\"relations\":[]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [],
+        "relations": []
+      }
+    }
+  },
+  {
+    "label": "open_nodes",
+    "tool": "open_nodes",
+    "args": {
+      "names": [
+        "Alice",
+        "Bob"
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Likes coffee\",\"Lives in Boston\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.743248+00:00\"},{\"name\":\"Bob\",\"entityType\":\"Person\",\"observations\":[\"New colleague\"],\"createdAt\":\"2026-06-11T16:47:19.692026+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.692026+00:00\"}],\"relations\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Bob\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Alice\",\"to\":\"Bob\",\"relationType\":\"manages\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Likes coffee",
+              "Lives in Boston"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.743248+00:00"
+          },
+          {
+            "name": "Bob",
+            "entityType": "Person",
+            "observations": [
+              "New colleague"
+            ],
+            "createdAt": "2026-06-11T16:47:19.692026+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.692026+00:00"
+          }
+        ],
+        "relations": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Bob",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Alice",
+            "to": "Bob",
+            "relationType": "manages",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "open_nodes_missing",
+    "tool": "open_nodes",
+    "args": {
+      "names": [
+        "Nobody"
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[],\"relations\":[]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [],
+        "relations": []
+      }
+    }
+  },
+  {
+    "label": "read_graph",
+    "tool": "read_graph",
+    "args": {},
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Likes coffee\",\"Lives in Boston\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.743248+00:00\"},{\"name\":\"Project X\",\"entityType\":\"Project\",\"observations\":[],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"},{\"name\":\"Widget\",\"entityType\":\"Weird Gadget Thing\",\"observations\":[\"Title-case fallback test\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"},{\"name\":\"Bob\",\"entityType\":\"Person\",\"observations\":[\"New colleague\"],\"createdAt\":\"2026-06-11T16:47:19.692026+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.692026+00:00\"}],\"relations\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Bob\",\"to\":\"Project X\",\"relationType\":\"worksOn\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"},{\"from\":\"Alice\",\"to\":\"Bob\",\"relationType\":\"manages\",\"createdAt\":\"2026-06-11T16:47:19.709940+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.709940+00:00\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Likes coffee",
+              "Lives in Boston"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.743248+00:00"
+          },
+          {
+            "name": "Project X",
+            "entityType": "Project",
+            "observations": [],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          },
+          {
+            "name": "Widget",
+            "entityType": "Weird Gadget Thing",
+            "observations": [
+              "Title-case fallback test"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          },
+          {
+            "name": "Bob",
+            "entityType": "Person",
+            "observations": [
+              "New colleague"
+            ],
+            "createdAt": "2026-06-11T16:47:19.692026+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.692026+00:00"
+          }
+        ],
+        "relations": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Bob",
+            "to": "Project X",
+            "relationType": "worksOn",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          },
+          {
+            "from": "Alice",
+            "to": "Bob",
+            "relationType": "manages",
+            "createdAt": "2026-06-11T16:47:19.709940+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.709940+00:00"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "rename_entity_success",
+    "tool": "rename_entity",
+    "args": {
+      "name": "Widget",
+      "new_name": "Gadget"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"renamed\":{\"from\":\"Widget\",\"to\":\"Gadget\"},\"relationsUpdated\":0}"
+        }
+      ],
+      "structuredContent": {
+        "renamed": {
+          "from": "Widget",
+          "to": "Gadget"
+        },
+        "relationsUpdated": 0
+      }
+    }
+  },
+  {
+    "label": "rename_entity_missing",
+    "tool": "rename_entity",
+    "args": {
+      "name": "Nobody",
+      "new_name": "Somebody"
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'rename_entity': Entity 'Nobody' not found"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "rename_entity_collision",
+    "tool": "rename_entity",
+    "args": {
+      "name": "Alice",
+      "new_name": "Bob"
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'rename_entity': Entity 'Bob' already exists; use merge_entities to combine them"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "rename_entity_noop",
+    "tool": "rename_entity",
+    "args": {
+      "name": "Alice",
+      "new_name": "Alice"
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'rename_entity': rename is a no-op"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "merge_entities_success",
+    "tool": "merge_entities",
+    "args": {
+      "source": "Bob",
+      "target": "Alice"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"merged\":{\"source\":\"Bob\",\"target\":\"Alice\"},\"observationsAdded\":1,\"relationsRePointed\":2,\"relationsDropped\":2,\"discardedType\":null}"
+        }
+      ],
+      "structuredContent": {
+        "merged": {
+          "source": "Bob",
+          "target": "Alice"
+        },
+        "observationsAdded": 1,
+        "relationsRePointed": 2,
+        "relationsDropped": 2,
+        "discardedType": null
+      }
+    }
+  },
+  {
+    "label": "merge_entities_missing",
+    "tool": "merge_entities",
+    "args": {
+      "source": "Nobody",
+      "target": "Alice"
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'merge_entities': Entity 'Nobody' not found"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "merge_entities_self",
+    "tool": "merge_entities",
+    "args": {
+      "source": "Alice",
+      "target": "Alice"
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'merge_entities': cannot merge an entity with itself"
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "normalize_entity_types",
+    "tool": "normalize_entity_types",
+    "args": {},
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"changes\":[],\"total\":0}"
+        }
+      ],
+      "structuredContent": {
+        "changes": [],
+        "total": 0
+      }
+    }
+  },
+  {
+    "label": "delete_observations",
+    "tool": "delete_observations",
+    "args": {
+      "deletions": [
+        {
+          "entityName": "Alice",
+          "observations": [
+            "Likes coffee",
+            "not-present"
+          ]
+        },
+        {
+          "entityName": "Nobody",
+          "observations": [
+            "ignored silently"
+          ]
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"deleted\":[{\"entityName\":\"Alice\",\"observations\":[\"Likes coffee\",\"not-present\"]},{\"entityName\":\"Nobody\",\"observations\":[\"ignored silently\"]}]}"
+        }
+      ],
+      "structuredContent": {
+        "deleted": [
+          {
+            "entityName": "Alice",
+            "observations": [
+              "Likes coffee",
+              "not-present"
+            ]
+          },
+          {
+            "entityName": "Nobody",
+            "observations": [
+              "ignored silently"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "delete_relations",
+    "tool": "delete_relations",
+    "args": {
+      "relations": [
+        {
+          "from": "Alice",
+          "to": "Project X",
+          "relationType": "worksOn"
+        }
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"deleted\":[{\"from\":\"Alice\",\"to\":\"Project X\",\"relationType\":\"worksOn\"}]}"
+        }
+      ],
+      "structuredContent": {
+        "deleted": [
+          {
+            "from": "Alice",
+            "to": "Project X",
+            "relationType": "worksOn"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "label": "delete_entities",
+    "tool": "delete_entities",
+    "args": {
+      "entityNames": [
+        "Gadget",
+        "NotThere"
+      ]
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"deleted\":[\"Gadget\",\"NotThere\"]}"
+        }
+      ],
+      "structuredContent": {
+        "deleted": [
+          "Gadget",
+          "NotThere"
+        ]
+      }
+    }
+  },
+  {
+    "label": "readonly_write_rejected",
+    "tool": "create_entities",
+    "args": {
+      "entities": [
+        {
+          "name": "Eve",
+          "entityType": "person",
+          "observations": []
+        }
+      ]
+    },
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'create_entities': This token has read-only access. Write operations are not allowed."
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "readonly_read_allowed",
+    "tool": "search_nodes",
+    "args": {
+      "query": "alice"
+    },
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Lives in Boston\",\"New colleague\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:20.088950+00:00\"}],\"relations\":[]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Lives in Boston",
+              "New colleague"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:20.088950+00:00"
+          }
+        ],
+        "relations": []
+      }
+    }
+  },
+  {
+    "label": "bad_token",
+    "tool": "read_graph",
+    "args": {},
+    "result": {
+      "isError": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "Error calling tool 'read_graph': Unknown or invalid authentication token."
+        }
+      ],
+      "structuredContent": null
+    }
+  },
+  {
+    "label": "final_read_graph",
+    "tool": "read_graph",
+    "args": {},
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"entities\":[{\"name\":\"Alice\",\"entityType\":\"Person\",\"observations\":[\"Lives in Boston\",\"New colleague\"],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:20.088950+00:00\"},{\"name\":\"Project X\",\"entityType\":\"Project\",\"observations\":[],\"createdAt\":\"2026-06-11T16:47:19.673439+00:00\",\"lastUpdated\":\"2026-06-11T16:47:19.673439+00:00\"}],\"relations\":[]}"
+        }
+      ],
+      "structuredContent": {
+        "entities": [
+          {
+            "name": "Alice",
+            "entityType": "Person",
+            "observations": [
+              "Lives in Boston",
+              "New colleague"
+            ],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:20.088950+00:00"
+          },
+          {
+            "name": "Project X",
+            "entityType": "Project",
+            "observations": [],
+            "createdAt": "2026-06-11T16:47:19.673439+00:00",
+            "lastUpdated": "2026-06-11T16:47:19.673439+00:00"
+          }
+        ],
+        "relations": []
+      }
+    }
+  }
+]

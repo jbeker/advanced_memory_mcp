@@ -1,0 +1,2 @@
+{"type": "entity", "name": "Alice", "entityType": "Person", "observations": ["Lives in Boston", "New colleague"], "createdAt": "2026-06-11T16:47:19.673439+00:00", "lastUpdated": "2026-06-11T16:47:20.088950+00:00"}
+{"type": "entity", "name": "Project X", "entityType": "Project", "observations": [], "createdAt": "2026-06-11T16:47:19.673439+00:00", "lastUpdated": "2026-06-11T16:47:19.673439+00:00"}
