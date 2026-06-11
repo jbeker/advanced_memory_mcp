@@ -13,6 +13,7 @@ dependencies = [
  "clap",
  "hmac",
  "http",
+ "http-body-util",
  "minijinja",
  "percent-encoding",
  "rand 0.9.4",
@@ -27,6 +28,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1059,7 +1061,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2929e494b2280e1e18959bb2e121da03347ae896896fdfaceaab43c88a02803f"
 dependencies = [
  "memo-map",
+ "percent-encoding",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

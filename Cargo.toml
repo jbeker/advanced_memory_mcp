@@ -30,7 +30,7 @@ clap = { version = "4", features = ["derive", "env"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-minijinja = "2"
+minijinja = { version = "2", features = ["urlencode", "json"] }
 hmac = "0.12"
 sha2 = "0.10"
 subtle = "2"
@@ -43,6 +43,8 @@ anyhow = "1"
 [dev-dependencies]
 tempfile = "3"
 reqwest = { version = "0.12", features = ["json"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
 
 [profile.release]
 lto = true

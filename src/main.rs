@@ -109,7 +109,24 @@ async fn main() -> anyhow::Result<()> {
             .with_cancellation_token(ct.child_token()),
     );
 
-    let router = axum::Router::new().nest_service("/mcp", mcp_service);
+    let ui_secret = match std::env::var("MEMORY_UI_SECRET") {
+        Ok(secret) if !secret.is_empty() => secret,
+        _ => {
+            tracing::warn!(
+                "MEMORY_UI_SECRET not set; using ephemeral secret. \
+                 UI sessions will be invalidated when the server restarts."
+            );
+            use rand::Rng;
+            let bytes: [u8; 32] = rand::rng().random();
+            use base64::Engine;
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+        }
+    };
+
+    let router = axum::Router::new()
+        .nest_service("/mcp", mcp_service)
+        .merge(advanced_memory_mcp::webui::router(state.clone(), ui_secret));
+    tracing::info!("Web UI available at /ui/");
 
     let listener = tokio::net::TcpListener::bind((args.host.as_str(), args.port)).await?;
     tracing::info!("listening on {}", listener.local_addr()?);

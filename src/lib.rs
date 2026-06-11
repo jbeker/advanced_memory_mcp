@@ -8,3 +8,4 @@ pub mod graph;
 pub mod mcp;
 pub mod store;
 pub mod tokens;
+pub mod webui;
