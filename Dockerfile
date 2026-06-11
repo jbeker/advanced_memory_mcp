@@ -1,15 +1,24 @@
-FROM python:3.13-slim
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+FROM rust:1-slim AS builder
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# Cache the dependency build separately from source changes.
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && \
+    echo 'fn main() {}' > src/main.rs && \
+    echo '' > src/lib.rs && \
+    cargo build --release && \
+    rm -rf src
 
-COPY server.py knowledge_graph.py token_config.py ./
-COPY webui ./webui
-RUN uv sync --frozen --no-dev
+# Templates and static assets are embedded at compile time.
+COPY src ./src
+COPY webui/templates ./webui/templates
+COPY webui/static ./webui/static
+RUN touch src/main.rs src/lib.rs && cargo build --release
+
+FROM debian:bookworm-slim
+
+COPY --from=builder /app/target/release/advanced-memory-mcp /usr/local/bin/advanced-memory-mcp
 
 ENV MCP_DATA_DIR=/data
 ENV MCP_HOST=0.0.0.0
@@ -22,4 +31,4 @@ VOLUME /data
 VOLUME /config
 EXPOSE 8765
 
-ENTRYPOINT ["uv", "run", "advanced-memory-mcp"]
+ENTRYPOINT ["advanced-memory-mcp"]

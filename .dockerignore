@@ -5,3 +5,4 @@ memory.json
 tokens.json
 .git/
 .gitignore
+target
