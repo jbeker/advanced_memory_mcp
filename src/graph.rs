@@ -49,6 +49,86 @@ pub fn normalize_entity_type(entity_type: &str, aliases: &HashMap<String, String
     py_title(entity_type)
 }
 
+/// A single observation as a bitemporal fact.
+///
+/// `validFrom`/`validTo` bound when the fact was true in the world (null
+/// `validTo` = still current); `recordedAt` is when the server learned it;
+/// `source` is a free-form provenance reference. Legacy v1 files store
+/// observations as plain strings — the deserializer accepts both and the
+/// serializer always writes objects, so files upgrade in place on first
+/// write. A fact's identity within its entity is its exact `text` (dedup,
+/// delete, update, and `supersedes` references all match on it).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Fact {
+    pub text: String,
+    #[serde(rename = "validFrom", skip_serializing_if = "Option::is_none")]
+    pub valid_from: Option<String>,
+    #[serde(rename = "validTo", skip_serializing_if = "Option::is_none")]
+    pub valid_to: Option<String>,
+    #[serde(rename = "recordedAt", skip_serializing_if = "Option::is_none")]
+    pub recorded_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Fact {
+    pub fn from_text(text: impl Into<String>) -> Self {
+        Fact {
+            text: text.into(),
+            valid_from: None,
+            valid_to: None,
+            recorded_at: None,
+            source: None,
+            extra: Map::new(),
+        }
+    }
+
+    /// Still-current: no end to its validity interval.
+    pub fn is_active(&self) -> bool {
+        self.valid_to.is_none()
+    }
+}
+
+impl<'de> Deserialize<'de> for Fact {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct FactObject {
+            text: String,
+            #[serde(rename = "validFrom", default)]
+            valid_from: Option<String>,
+            #[serde(rename = "validTo", default)]
+            valid_to: Option<String>,
+            #[serde(rename = "recordedAt", default)]
+            recorded_at: Option<String>,
+            #[serde(default)]
+            source: Option<String>,
+            #[serde(flatten)]
+            extra: Map<String, Value>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Legacy(String),
+            Object(FactObject),
+        }
+
+        Ok(match Repr::deserialize(deserializer)? {
+            Repr::Legacy(text) => Fact::from_text(text),
+            Repr::Object(o) => Fact {
+                text: o.text,
+                valid_from: o.valid_from,
+                valid_to: o.valid_to,
+                recorded_at: o.recorded_at,
+                source: o.source,
+                extra: o.extra,
+            },
+        })
+    }
+}
+
 /// An entity line. Field declaration order is the on-disk key order.
 /// `entityType`/`observations` are omitted when absent (legacy lines);
 /// `createdAt`/`lastUpdated` are always written, `null` when unknown,
@@ -60,7 +140,7 @@ pub struct Entity {
     #[serde(rename = "entityType", default, skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub observations: Option<Vec<String>>,
+    pub observations: Option<Vec<Fact>>,
     #[serde(rename = "createdAt", default)]
     pub created_at: Option<String>,
     #[serde(rename = "lastUpdated", default)]
@@ -74,7 +154,7 @@ impl Entity {
         self.entity_type.as_deref().unwrap_or("")
     }
 
-    pub fn observations_slice(&self) -> &[String] {
+    pub fn observations_slice(&self) -> &[Fact] {
         self.observations.as_deref().unwrap_or(&[])
     }
 }
@@ -106,13 +186,60 @@ pub struct Graph {
     pub relations: Vec<Relation>,
 }
 
+/// One observation to write: the fact fields a caller may set, plus an
+/// optional `supersedes` reference (exact text of an active fact on the same
+/// entity to close when this one lands).
+#[derive(Debug, Clone)]
+pub struct FactInput {
+    pub text: String,
+    pub valid_from: Option<String>,
+    pub valid_to: Option<String>,
+    pub source: Option<String>,
+    pub supersedes: Option<String>,
+    pub extra: Map<String, Value>,
+}
+
+impl FactInput {
+    pub fn from_text(text: impl Into<String>) -> Self {
+        FactInput {
+            text: text.into(),
+            valid_from: None,
+            valid_to: None,
+            source: None,
+            supersedes: None,
+            extra: Map::new(),
+        }
+    }
+}
+
 /// Per-entity result of `add_observations`.
 #[derive(Debug, Serialize)]
 pub struct AddedObservations {
     #[serde(rename = "entityName")]
     pub entity_name: String,
     #[serde(rename = "addedObservations")]
-    pub added_observations: Vec<String>,
+    pub added_observations: Vec<Fact>,
+}
+
+/// Filters for `search_facts`. All optional; they layer (AND).
+#[derive(Debug, Default)]
+pub struct FactQuery {
+    /// Case-insensitive substring on fact text.
+    pub query: Option<String>,
+    /// Exact entity name.
+    pub entity: Option<String>,
+    /// Facts valid at this instant: validFrom <= asOf < validTo.
+    pub as_of: Option<String>,
+    /// validFrom >= since (facts without validFrom are excluded).
+    pub since: Option<String>,
+    /// validFrom <= until (facts without validFrom are excluded).
+    pub until: Option<String>,
+    /// Include facts whose validity has ended. Implied by as_of.
+    pub include_superseded: bool,
+    /// Sort ascending by validFrom instead of the default descending.
+    pub ascending: bool,
+    /// Maximum facts returned.
+    pub limit: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -175,44 +302,185 @@ impl Graph {
         added
     }
 
-    /// Append observations to existing entities, deduplicating against the
-    /// entity's current list. Errors (without mutating) if any named entity
-    /// is missing — Python aborts before saving, so the net effect there is
-    /// also "no change".
+    /// Append observations as bitemporal facts, deduplicating by text
+    /// against the entity's existing facts. `recordedAt` is set to now;
+    /// `validFrom` defaults to now when not supplied. A `supersedes`
+    /// reference closes the named active fact by setting its `validTo` to
+    /// the new fact's `validFrom`.
+    ///
+    /// Errors (without mutating) if any named entity is missing, or if a
+    /// supersedes target doesn't exist, isn't active, or would be closed
+    /// twice in one call. Entries skipped by dedup do NOT apply their
+    /// supersedes — the whole entry is a no-op.
     pub fn add_observations(
         &mut self,
-        observations: Vec<(String, Vec<String>)>,
+        observations: Vec<(String, Vec<FactInput>)>,
     ) -> Result<Vec<AddedObservations>, String> {
-        for (entity_name, _) in &observations {
-            if self.entity_index(entity_name).is_none() {
+        let now = now_iso();
+
+        // Validate everything against current state before touching it.
+        let mut pending_closures: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
+        for (entity_name, inputs) in &observations {
+            let Some(idx) = self.entity_index(entity_name) else {
                 return Err(format!("Entity '{entity_name}' not found"));
+            };
+            let entity = &self.entities[idx];
+            let existing_texts: std::collections::HashSet<&str> = entity
+                .observations_slice()
+                .iter()
+                .map(|f| f.text.as_str())
+                .collect();
+            for input in inputs {
+                let Some(target) = &input.supersedes else { continue };
+                if existing_texts.contains(input.text.as_str()) {
+                    // Dedup will skip this entry entirely; its supersedes is
+                    // intentionally not applied.
+                    continue;
+                }
+                let Some(target_fact) = entity
+                    .observations_slice()
+                    .iter()
+                    .find(|f| &f.text == target)
+                else {
+                    return Err(format!(
+                        "Cannot supersede: no observation with text '{target}' on entity '{entity_name}'"
+                    ));
+                };
+                if !target_fact.is_active() {
+                    return Err(format!(
+                        "Cannot supersede: observation '{target}' on entity '{entity_name}' is already superseded"
+                    ));
+                }
+                if !pending_closures.insert((entity_name.clone(), target.clone())) {
+                    return Err(format!(
+                        "Cannot supersede: observation '{target}' on entity '{entity_name}' is superseded twice in this call"
+                    ));
+                }
             }
         }
-        let now = now_iso();
+
         let mut results = Vec::new();
-        for (entity_name, contents) in observations {
+        for (entity_name, inputs) in observations {
             let idx = self.entity_index(&entity_name).unwrap();
             let entity = &mut self.entities[idx];
-            let existing: std::collections::HashSet<&String> =
-                entity.observations_slice().iter().collect();
-            let new_obs: Vec<String> = contents
-                .iter()
-                .filter(|o| !existing.contains(o))
-                .cloned()
-                .collect();
-            entity
-                .observations
-                .get_or_insert_with(Vec::new)
-                .extend(new_obs.iter().cloned());
-            if !new_obs.is_empty() {
+            let mut added: Vec<Fact> = Vec::new();
+            for input in inputs {
+                let exists = entity
+                    .observations_slice()
+                    .iter()
+                    .any(|f| f.text == input.text)
+                    || added.iter().any(|f| f.text == input.text);
+                if exists {
+                    continue;
+                }
+                let fact = Fact {
+                    text: input.text,
+                    valid_from: Some(input.valid_from.unwrap_or_else(|| now.clone())),
+                    valid_to: input.valid_to,
+                    recorded_at: Some(now.clone()),
+                    source: input.source,
+                    extra: input.extra,
+                };
+                if let Some(target) = input.supersedes {
+                    let closed_at = fact.valid_from.clone();
+                    let target_fact = entity
+                        .observations
+                        .get_or_insert_with(Vec::new)
+                        .iter_mut()
+                        .find(|f| f.text == target)
+                        .expect("validated above");
+                    target_fact.valid_to = closed_at;
+                }
+                entity
+                    .observations
+                    .get_or_insert_with(Vec::new)
+                    .push(fact.clone());
+                added.push(fact);
+            }
+            if !added.is_empty() {
                 entity.last_updated = Some(now.clone());
             }
             results.push(AddedObservations {
                 entity_name,
-                added_observations: new_obs,
+                added_observations: added,
             });
         }
         Ok(results)
+    }
+
+    /// Fact-level temporal search. Returns (matching facts with their entity
+    /// names, total match count before `limit`).
+    pub fn search_facts(&self, q: &FactQuery) -> (Vec<(String, Fact)>, usize) {
+        let needle = q.query.as_deref().map(str::to_lowercase);
+        let mut hits: Vec<(&str, &Fact)> = Vec::new();
+
+        for entity in &self.entities {
+            if let Some(name) = &q.entity {
+                if &entity.name != name {
+                    continue;
+                }
+            }
+            for fact in entity.observations_slice() {
+                if let Some(needle) = &needle {
+                    if !fact.text.to_lowercase().contains(needle) {
+                        continue;
+                    }
+                }
+                if let Some(as_of) = &q.as_of {
+                    // Null validFrom counts as always-valid history.
+                    if let Some(from) = &fact.valid_from {
+                        if from > as_of {
+                            continue;
+                        }
+                    }
+                    if let Some(to) = &fact.valid_to {
+                        if to <= as_of {
+                            continue;
+                        }
+                    }
+                } else if !q.include_superseded && !fact.is_active() {
+                    continue;
+                }
+                if let Some(since) = &q.since {
+                    match &fact.valid_from {
+                        Some(from) if from >= since => {}
+                        _ => continue, // unplaceable facts are excluded from windows
+                    }
+                }
+                if let Some(until) = &q.until {
+                    match &fact.valid_from {
+                        Some(from) if from <= until => {}
+                        _ => continue,
+                    }
+                }
+                hits.push((&entity.name, fact));
+            }
+        }
+
+        // validFrom (nulls last), ties by recordedAt; direction per query.
+        let key = |f: &Fact| (f.valid_from.clone(), f.recorded_at.clone());
+        if q.ascending {
+            hits.sort_by(|a, b| match (key(a.1), key(b.1)) {
+                ((None, _), (Some(_), _)) => std::cmp::Ordering::Greater,
+                ((Some(_), _), (None, _)) => std::cmp::Ordering::Less,
+                (ka, kb) => ka.cmp(&kb),
+            });
+        } else {
+            hits.sort_by(|a, b| match (key(a.1), key(b.1)) {
+                ((None, _), (Some(_), _)) => std::cmp::Ordering::Greater,
+                ((Some(_), _), (None, _)) => std::cmp::Ordering::Less,
+                (ka, kb) => kb.cmp(&ka),
+            });
+        }
+
+        let total = hits.len();
+        let facts = hits
+            .into_iter()
+            .take(q.limit)
+            .map(|(name, fact)| (name.to_string(), fact.clone()))
+            .collect();
+        (facts, total)
     }
 
     /// Delete entities by name, cascading to relations that touch them.
@@ -290,14 +558,17 @@ impl Graph {
         let now = now_iso();
         let src = self.entities[src_idx].clone();
 
-        // Observations: union, target order preserved.
+        // Observations: union by text, target order preserved.
         let tgt = &mut self.entities[tgt_idx];
-        let existing: std::collections::HashSet<&String> =
-            tgt.observations_slice().iter().collect();
-        let new_obs: Vec<String> = src
+        let existing: std::collections::HashSet<&str> = tgt
             .observations_slice()
             .iter()
-            .filter(|o| !existing.contains(o))
+            .map(|f| f.text.as_str())
+            .collect();
+        let new_obs: Vec<Fact> = src
+            .observations_slice()
+            .iter()
+            .filter(|f| !existing.contains(f.text.as_str()))
             .cloned()
             .collect();
         let observations_added = new_obs.len() as u64;
@@ -390,33 +661,27 @@ impl Graph {
         }))
     }
 
-    /// Replace the first observation matching `original_text` in place
-    /// (web UI edit flow). Returns false if entity or text is missing.
+    /// Replace the text of the first fact matching `original_text` in place,
+    /// preserving its temporal fields (web UI edit flow). Returns the
+    /// updated fact, or None if entity or text is missing.
     pub fn update_observation(
         &mut self,
         entity_name: &str,
         original_text: &str,
         new_text: &str,
-    ) -> bool {
-        match self.entity_index(entity_name) {
-            None => false,
-            Some(idx) => {
-                let entity = &mut self.entities[idx];
-                let obs = entity.observations.get_or_insert_with(Vec::new);
-                match obs.iter().position(|o| o == original_text) {
-                    None => false,
-                    Some(i) => {
-                        obs[i] = new_text.to_string();
-                        entity.last_updated = Some(now_iso());
-                        true
-                    }
-                }
-            }
-        }
+    ) -> Option<Fact> {
+        let idx = self.entity_index(entity_name)?;
+        let entity = &mut self.entities[idx];
+        let obs = entity.observations.get_or_insert_with(Vec::new);
+        let i = obs.iter().position(|f| f.text == original_text)?;
+        obs[i].text = new_text.to_string();
+        let updated = obs[i].clone();
+        entity.last_updated = Some(now_iso());
+        Some(updated)
     }
 
-    /// Remove specific observations from entities. Missing entities and
-    /// missing observations are silently ignored.
+    /// Remove facts by exact text. Missing entities and missing
+    /// observations are silently ignored.
     pub fn delete_observations(&mut self, deletions: Vec<(String, Vec<String>)>) {
         let now = now_iso();
         for (entity_name, observations) in deletions {
@@ -427,7 +692,7 @@ impl Graph {
             let entity = &mut self.entities[idx];
             let before = entity.observations_slice().len();
             if let Some(obs) = &mut entity.observations {
-                obs.retain(|o| !to_remove.contains(o));
+                obs.retain(|f| !to_remove.contains(&f.text));
                 if obs.len() < before {
                     entity.last_updated = Some(now.clone());
                 }
@@ -454,7 +719,7 @@ impl Graph {
                     || e.entity_type_str().to_lowercase().contains(&q)
                     || e.observations_slice()
                         .iter()
-                        .any(|o| o.to_lowercase().contains(&q))
+                        .any(|f| f.text.to_lowercase().contains(&q))
             })
             .cloned()
             .collect();
@@ -529,9 +794,29 @@ mod tests {
         Entity {
             name: name.into(),
             entity_type: Some(etype.into()),
-            observations: Some(obs.iter().map(|s| s.to_string()).collect()),
+            observations: Some(obs.iter().map(|s| Fact::from_text(*s)).collect()),
             created_at: None,
             last_updated: None,
+            extra: Map::new(),
+        }
+    }
+
+    fn obs_texts(g: &Graph, name: &str) -> Vec<String> {
+        let idx = g.entity_index(name).unwrap();
+        g.entities[idx]
+            .observations_slice()
+            .iter()
+            .map(|f| f.text.clone())
+            .collect()
+    }
+
+    fn fact_at(text: &str, from: &str, to: Option<&str>) -> FactInput {
+        FactInput {
+            text: text.into(),
+            valid_from: Some(from.into()),
+            valid_to: to.map(Into::into),
+            source: None,
+            supersedes: None,
             extra: Map::new(),
         }
     }
@@ -609,19 +894,285 @@ mod tests {
         g.create_entities(vec![entity("Alice", "person", &["x"])], &aliases());
 
         let res = g
-            .add_observations(vec![("Alice".into(), vec!["x".into(), "y".into()])])
+            .add_observations(vec![(
+                "Alice".into(),
+                vec![FactInput::from_text("x"), FactInput::from_text("y")],
+            )])
             .unwrap();
-        assert_eq!(res[0].added_observations, vec!["y".to_string()]);
+        let texts: Vec<&str> = res[0]
+            .added_observations
+            .iter()
+            .map(|f| f.text.as_str())
+            .collect();
+        assert_eq!(texts, ["y"]);
 
         let err = g
             .add_observations(vec![
-                ("Alice".into(), vec!["z".into()]),
-                ("Nobody".into(), vec!["w".into()]),
+                ("Alice".into(), vec![FactInput::from_text("z")]),
+                ("Nobody".into(), vec![FactInput::from_text("w")]),
             ])
             .unwrap_err();
         assert_eq!(err, "Entity 'Nobody' not found");
         // Pre-validation means Alice was NOT mutated by the failed call.
-        assert_eq!(g.entities[0].observations_slice(), ["x", "y"]);
+        assert_eq!(obs_texts(&g, "Alice"), ["x", "y"]);
+    }
+
+    #[test]
+    fn add_defaults_valid_from_and_recorded_at_to_now() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        let res = g
+            .add_observations(vec![("A".into(), vec![FactInput::from_text("fresh")])])
+            .unwrap();
+        let fact = &res[0].added_observations[0];
+        assert!(fact.valid_from.is_some());
+        assert_eq!(fact.valid_from, fact.recorded_at);
+        assert!(fact.valid_to.is_none());
+
+        // Explicit validFrom (event date) is preserved; recordedAt is now.
+        let res = g
+            .add_observations(vec![(
+                "A".into(),
+                vec![fact_at("backfilled", "2026-05-01", None)],
+            )])
+            .unwrap();
+        let fact = &res[0].added_observations[0];
+        assert_eq!(fact.valid_from.as_deref(), Some("2026-05-01"));
+        assert_ne!(fact.recorded_at, fact.valid_from);
+    }
+
+    #[test]
+    fn supersedes_closes_the_target_fact() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![fact_at("target is January", "2026-01-10", None)],
+        )])
+        .unwrap();
+
+        let mut input = fact_at("target is March", "2026-02-15", None);
+        input.supersedes = Some("target is January".into());
+        g.add_observations(vec![("A".into(), vec![input])]).unwrap();
+
+        let idx = g.entity_index("A").unwrap();
+        let old = &g.entities[idx].observations_slice()[0];
+        assert_eq!(old.valid_to.as_deref(), Some("2026-02-15"));
+        let new = &g.entities[idx].observations_slice()[1];
+        assert!(new.is_active());
+    }
+
+    #[test]
+    fn supersedes_error_paths_leave_graph_unchanged() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![fact_at("old", "2026-01-01", Some("2026-02-01")), fact_at("active", "2026-02-01", None)],
+        )])
+        .unwrap();
+
+        // Missing target.
+        let mut input = fact_at("new1", "2026-03-01", None);
+        input.supersedes = Some("nonexistent".into());
+        let err = g.add_observations(vec![("A".into(), vec![input])]).unwrap_err();
+        assert!(err.contains("no observation with text 'nonexistent'"), "{err}");
+
+        // Already-superseded target.
+        let mut input = fact_at("new2", "2026-03-01", None);
+        input.supersedes = Some("old".into());
+        let err = g.add_observations(vec![("A".into(), vec![input])]).unwrap_err();
+        assert!(err.contains("already superseded"), "{err}");
+
+        // Double-close in one call.
+        let mut i1 = fact_at("new3", "2026-03-01", None);
+        i1.supersedes = Some("active".into());
+        let mut i2 = fact_at("new4", "2026-03-02", None);
+        i2.supersedes = Some("active".into());
+        let err = g
+            .add_observations(vec![("A".into(), vec![i1, i2])])
+            .unwrap_err();
+        assert!(err.contains("superseded twice"), "{err}");
+
+        // Nothing changed.
+        assert_eq!(obs_texts(&g, "A"), ["old", "active"]);
+        let idx = g.entity_index("A").unwrap();
+        assert!(g.entities[idx].observations_slice()[1].is_active());
+    }
+
+    #[test]
+    fn dedup_skipped_entry_does_not_apply_supersedes() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![fact_at("existing", "2026-01-01", None), fact_at("victim", "2026-01-02", None)],
+        )])
+        .unwrap();
+
+        // "existing" is a duplicate; its supersedes must be ignored.
+        let mut input = fact_at("existing", "2026-03-01", None);
+        input.supersedes = Some("victim".into());
+        let res = g.add_observations(vec![("A".into(), vec![input])]).unwrap();
+        assert!(res[0].added_observations.is_empty());
+        let idx = g.entity_index("A").unwrap();
+        assert!(g.entities[idx].observations_slice()[1].is_active());
+    }
+
+    #[test]
+    fn search_facts_active_only_default_and_include_superseded() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![
+                fact_at("old plan", "2026-01-01", Some("2026-02-01")),
+                fact_at("current plan", "2026-02-01", None),
+            ],
+        )])
+        .unwrap();
+
+        let (facts, total) = g.search_facts(&FactQuery {
+            query: Some("plan".into()),
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(total, 1);
+        assert_eq!(facts[0].1.text, "current plan");
+
+        let (facts, total) = g.search_facts(&FactQuery {
+            query: Some("plan".into()),
+            include_superseded: true,
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(total, 2);
+        // Default descending by validFrom.
+        assert_eq!(facts[0].1.text, "current plan");
+        assert_eq!(facts[1].1.text, "old plan");
+    }
+
+    #[test]
+    fn search_facts_as_of_returns_truth_at_that_time() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &["legacy note"])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![
+                fact_at("guess: January", "2026-01-01", Some("2026-03-01")),
+                fact_at("firm: April", "2026-03-01", None),
+            ],
+        )])
+        .unwrap();
+
+        let q = |as_of: &str| FactQuery {
+            as_of: Some(as_of.into()),
+            limit: 10,
+            ..Default::default()
+        };
+        // Mid-February: the superseded guess was the standing truth.
+        let (facts, _) = g.search_facts(&q("2026-02-01"));
+        let texts: Vec<&str> = facts.iter().map(|f| f.1.text.as_str()).collect();
+        assert!(texts.contains(&"guess: January"));
+        assert!(!texts.contains(&"firm: April"));
+        // Null validFrom (legacy) counts as always valid.
+        assert!(texts.contains(&"legacy note"));
+
+        // Boundary: validTo is exclusive, validFrom inclusive.
+        let (facts, _) = g.search_facts(&q("2026-03-01"));
+        let texts: Vec<&str> = facts.iter().map(|f| f.1.text.as_str()).collect();
+        assert!(!texts.contains(&"guess: January"));
+        assert!(texts.contains(&"firm: April"));
+    }
+
+    #[test]
+    fn search_facts_window_excludes_unplaceable_facts() {
+        let mut g = Graph::default();
+        g.create_entities(vec![entity("A", "t", &["legacy note"])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![
+                fact_at("february item", "2026-02-15", None),
+                fact_at("may item", "2026-05-10", None),
+            ],
+        )])
+        .unwrap();
+
+        let (facts, total) = g.search_facts(&FactQuery {
+            since: Some("2026-05-01".into()),
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(total, 1);
+        assert_eq!(facts[0].1.text, "may item");
+
+        let (facts, _) = g.search_facts(&FactQuery {
+            since: Some("2026-01-01".into()),
+            until: Some("2026-03-01".into()),
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].1.text, "february item");
+    }
+
+    #[test]
+    fn search_facts_ordering_limit_and_entity_filter() {
+        let mut g = Graph::default();
+        g.create_entities(
+            vec![entity("A", "t", &["nodate"]), entity("B", "t", &[])],
+            &aliases(),
+        );
+        g.add_observations(vec![
+            ("A".into(), vec![fact_at("first", "2026-01-01", None)]),
+            ("B".into(), vec![fact_at("second", "2026-02-01", None)]),
+        ])
+        .unwrap();
+
+        // History: ascending, nulls last.
+        let (facts, total) = g.search_facts(&FactQuery {
+            ascending: true,
+            include_superseded: true,
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(total, 3);
+        let texts: Vec<&str> = facts.iter().map(|f| f.1.text.as_str()).collect();
+        assert_eq!(texts, ["first", "second", "nodate"]);
+
+        // Limit truncates but total reports everything.
+        let (facts, total) = g.search_facts(&FactQuery {
+            limit: 1,
+            ..Default::default()
+        });
+        assert_eq!(facts.len(), 1);
+        assert_eq!(total, 3);
+        assert_eq!(facts[0].1.text, "second"); // most recent validFrom first
+
+        // Entity filter.
+        let (facts, _) = g.search_facts(&FactQuery {
+            entity: Some("B".into()),
+            limit: 10,
+            ..Default::default()
+        });
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].0, "B");
+    }
+
+    #[test]
+    fn fact_deserializes_from_string_or_object() {
+        let legacy: Fact = serde_json::from_str("\"plain text\"").unwrap();
+        assert_eq!(legacy.text, "plain text");
+        assert!(legacy.valid_from.is_none());
+
+        let full: Fact = serde_json::from_str(
+            r#"{"text": "t", "validFrom": "2026-01-01", "validTo": null, "recordedAt": "2026-01-02", "source": "1:1 notes", "custom": 7}"#,
+        )
+        .unwrap();
+        assert_eq!(full.valid_from.as_deref(), Some("2026-01-01"));
+        assert!(full.valid_to.is_none());
+        assert_eq!(full.source.as_deref(), Some("1:1 notes"));
+        assert_eq!(full.extra["custom"], 7);
     }
 
     #[test]
@@ -696,8 +1247,8 @@ mod tests {
         assert_eq!(result["relationsDropped"], 2); // 1 self-loop + 1 duplicate
         assert_eq!(result["discardedType"], "Colleague");
 
+        assert_eq!(obs_texts(&g, "Alice"), ["shared", "a1", "b1"]);
         let alice = &g.entities[g.entity_index("Alice").unwrap()];
-        assert_eq!(alice.observations_slice(), ["shared", "a1", "b1"]);
         assert_eq!(alice.created_at.as_deref(), Some("2020-01-01T00:00:00+00:00"));
         assert!(g.entity_index("Bob").is_none());
         assert_eq!(g.relations.len(), 1);
@@ -755,13 +1306,20 @@ mod tests {
     }
 
     #[test]
-    fn update_observation_replaces_in_place() {
+    fn update_observation_replaces_text_preserving_temporal_fields() {
         let mut g = Graph::default();
-        g.create_entities(vec![entity("A", "t", &["one", "two"])], &aliases());
-        assert!(g.update_observation("A", "one", "uno"));
-        assert_eq!(g.entities[0].observations_slice(), ["uno", "two"]);
-        assert!(!g.update_observation("A", "missing", "x"));
-        assert!(!g.update_observation("Nobody", "one", "x"));
+        g.create_entities(vec![entity("A", "t", &[])], &aliases());
+        g.add_observations(vec![(
+            "A".into(),
+            vec![fact_at("one", "2026-01-01", None), fact_at("two", "2026-01-02", None)],
+        )])
+        .unwrap();
+        let updated = g.update_observation("A", "one", "uno").unwrap();
+        assert_eq!(updated.text, "uno");
+        assert_eq!(updated.valid_from.as_deref(), Some("2026-01-01"));
+        assert_eq!(obs_texts(&g, "A"), ["uno", "two"]);
+        assert!(g.update_observation("A", "missing", "x").is_none());
+        assert!(g.update_observation("Nobody", "one", "x").is_none());
     }
 
     #[test]
@@ -772,7 +1330,7 @@ mod tests {
             ("A".into(), vec!["one".into(), "not-there".into()]),
             ("Nobody".into(), vec!["x".into()]),
         ]);
-        assert_eq!(g.entities[0].observations_slice(), ["two"]);
+        assert_eq!(obs_texts(&g, "A"), ["two"]);
     }
 
     #[test]

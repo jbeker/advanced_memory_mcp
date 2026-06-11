@@ -11,7 +11,7 @@
 //! - Malformed item errors say e.g. "missing field `name`" instead of
 //!   Python's bare KeyError text ("'name'").
 
-use crate::graph::{Entity, Relation};
+use crate::graph::{Entity, FactInput, FactQuery, Relation};
 use crate::store::{Store, StoreMap};
 use crate::tokens::{TokenConfig, TokenEntry};
 use http::request::Parts;
@@ -142,6 +142,23 @@ fn one_string_schema(a: &str) -> JsonObject {
     }))
 }
 
+fn search_facts_schema() -> JsonObject {
+    rmcp::model::object(json!({
+        "additionalProperties": false,
+        "properties": {
+            "query": {"type": "string", "description": "case-insensitive substring on fact text"},
+            "entityName": {"type": "string", "description": "exact entity name filter"},
+            "asOf": {"type": "string", "description": "facts valid at this instant (YYYY-MM-DD or ISO-8601)"},
+            "since": {"type": "string", "description": "validFrom >= since"},
+            "until": {"type": "string", "description": "validFrom <= until"},
+            "includeSuperseded": {"type": "boolean", "description": "include facts whose validity ended (default false)"},
+            "order": {"type": "string", "enum": ["desc", "asc"], "description": "validFrom ordering (default desc)"},
+            "limit": {"type": "integer", "minimum": 1, "description": "max facts returned (default 20)"},
+        },
+        "type": "object",
+    }))
+}
+
 fn no_params_schema() -> JsonObject {
     rmcp::model::object(json!({
         "additionalProperties": false,
@@ -211,7 +228,86 @@ struct NamesParams {
 struct ObservationInput {
     #[serde(rename = "entityName")]
     entity_name: String,
-    contents: Vec<String>,
+    contents: Vec<Value>,
+}
+
+/// Object form of a `contents` entry; plain strings are shorthand for
+/// `{"text": ...}`. Unknown fields are carried onto the stored fact.
+#[derive(Deserialize)]
+struct FactInputObject {
+    text: String,
+    #[serde(rename = "validFrom", default)]
+    valid_from: Option<String>,
+    #[serde(rename = "validTo", default)]
+    valid_to: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    supersedes: Option<String>,
+    #[serde(flatten)]
+    extra: serde_json::Map<String, Value>,
+}
+
+/// Validate a caller-supplied instant: date (YYYY-MM-DD) or ISO-8601
+/// datetime. Lexicographic comparison over mixed-precision ISO strings is
+/// what the engine relies on, so anything else is rejected loudly.
+fn validate_instant(field: &str, value: &Option<String>) -> Result<(), OpError> {
+    let Some(v) = value else { return Ok(()) };
+    let ok = chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").is_ok()
+        || chrono::DateTime::parse_from_rfc3339(v).is_ok();
+    if ok {
+        Ok(())
+    } else {
+        Err(OpError::Msg(format!(
+            "invalid {field} '{v}': use YYYY-MM-DD or ISO-8601 (e.g. 2026-05-01 or 2026-05-01T10:00:00+00:00)"
+        )))
+    }
+}
+
+fn parse_fact_inputs(contents: Vec<Value>) -> Result<Vec<FactInput>, OpError> {
+    contents
+        .into_iter()
+        .map(|v| match v {
+            Value::String(text) => Ok(FactInput::from_text(text)),
+            obj @ Value::Object(_) => {
+                let o: FactInputObject =
+                    serde_json::from_value(obj).map_err(|e| OpError::Msg(e.to_string()))?;
+                validate_instant("validFrom", &o.valid_from)?;
+                validate_instant("validTo", &o.valid_to)?;
+                Ok(FactInput {
+                    text: o.text,
+                    valid_from: o.valid_from,
+                    valid_to: o.valid_to,
+                    source: o.source,
+                    supersedes: o.supersedes,
+                    extra: o.extra,
+                })
+            }
+            other => Err(OpError::Msg(format!(
+                "observation contents must be strings or objects, got: {other}"
+            ))),
+        })
+        .collect()
+}
+
+#[derive(Deserialize)]
+struct SearchFactsParams {
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(rename = "entityName", default)]
+    entity_name: Option<String>,
+    #[serde(rename = "asOf", default)]
+    as_of: Option<String>,
+    #[serde(default)]
+    since: Option<String>,
+    #[serde(default)]
+    until: Option<String>,
+    #[serde(rename = "includeSuperseded", default)]
+    include_superseded: bool,
+    #[serde(default)]
+    limit: Option<u64>,
+    #[serde(default)]
+    order: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -273,7 +369,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Create multiple new entities in the knowledge graph.\n\nEach entity should have 'name', 'entityType', and 'observations' fields.\nDeduplicates by entity name - existing entities are skipped.\nNew entities receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps.",
+        description = "Create multiple new entities in the knowledge graph.\n\nEach entity should have 'name', 'entityType', and 'observations' fields.\nObservation entries may be plain strings or fact objects {text, validFrom,\nvalidTo, recordedAt, source}; they are stored as given (use add_observations\nfor write-time temporal defaults). Deduplicates by entity name - existing\nentities are skipped. New entities receive 'createdAt' and 'lastUpdated'\nISO 8601 UTC timestamps.",
         input_schema = objects_param_schema("entities")
     )]
     async fn create_entities(
@@ -308,7 +404,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Add new observations to existing entities.\n\nEach observation should have 'entityName' and 'contents' (list of strings).\nReturns error if entity doesn't exist. Deduplicates observations.",
+        description = "Add new observations (timestamped facts) to existing entities.\n\nEach observation has 'entityName' and 'contents': a list where each entry is\neither a plain string or an object {text, validFrom?, validTo?, source?,\nsupersedes?}. validFrom is when the fact became true in the world (e.g. the\nmeeting date, YYYY-MM-DD or ISO-8601) and defaults to write time; recordedAt\nis always set to write time. 'supersedes' names the exact text of an active\nfact on the same entity to close (its validTo becomes the new fact's\nvalidFrom) - it errors if the target is missing or already superseded.\nDeduplicates by text. Returns error if entity doesn't exist.",
         input_schema = objects_param_schema("observations")
     )]
     async fn add_observations(
@@ -321,10 +417,61 @@ impl MemoryServer {
             let inputs: Vec<ObservationInput> = parse_items(p.observations)?;
             let pairs = inputs
                 .into_iter()
-                .map(|o| (o.entity_name, o.contents))
-                .collect();
+                .map(|o| Ok((o.entity_name, parse_fact_inputs(o.contents)?)))
+                .collect::<Result<Vec<_>, OpError>>()?;
             let results = store.mutate(|g| g.add_observations(pairs).map_err(OpError::Msg))?;
             Ok(json!({"results": results}))
+        })
+    }
+
+    #[tool(
+        description = "Search observations as timestamped facts with temporal filters.\n\nAll parameters are optional and combine as AND filters:\n- query: case-insensitive substring matched against fact text\n- entityName: exact entity filter\n- asOf: return facts valid at that instant (validFrom <= asOf < validTo);\n  facts without validFrom count as always valid\n- since/until: window on validFrom; facts without validFrom are excluded\n- includeSuperseded: include facts whose validity ended (default false;\n  implied by asOf)\n- order: 'desc' (default, newest validFrom first) or 'asc' (history order);\n  facts without validFrom sort last\n- limit: max facts returned (default 20)\nDates are YYYY-MM-DD or ISO-8601; resolve relative times before calling.\nReturns {facts: [{entityName, text, validFrom, validTo, recordedAt,\nsource}], total} where total counts matches before the limit.",
+        input_schema = search_facts_schema()
+    )]
+    async fn search_facts(
+        &self,
+        Parameters(p): Parameters<SearchFactsParams>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        run("search_facts", || {
+            let store = self.authed_store(&parts, false)?;
+            validate_instant("asOf", &p.as_of)?;
+            validate_instant("since", &p.since)?;
+            validate_instant("until", &p.until)?;
+            let ascending = match p.order.as_deref() {
+                None | Some("desc") => false,
+                Some("asc") => true,
+                Some(other) => {
+                    return Err(OpError::Msg(format!(
+                        "invalid order '{other}': use 'asc' or 'desc'"
+                    )))
+                }
+            };
+            let query = FactQuery {
+                query: p.query,
+                entity: p.entity_name,
+                as_of: p.as_of,
+                since: p.since,
+                until: p.until,
+                include_superseded: p.include_superseded,
+                ascending,
+                limit: p.limit.unwrap_or(20) as usize,
+            };
+            let (hits, total) = store.read(|g| g.search_facts(&query));
+            let facts: Vec<Value> = hits
+                .into_iter()
+                .map(|(entity_name, fact)| {
+                    let mut obj = serde_json::Map::new();
+                    obj.insert("entityName".into(), Value::String(entity_name));
+                    if let Value::Object(fields) =
+                        serde_json::to_value(&fact).expect("fact serializes")
+                    {
+                        obj.extend(fields);
+                    }
+                    Value::Object(obj)
+                })
+                .collect();
+            Ok(json!({"facts": facts, "total": total}))
         })
     }
 
@@ -348,7 +495,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Delete specific observations from entities.\n\nEach deletion should have 'entityName' and 'observations' (list of strings to remove).\nSilently ignores missing entities or observations.",
+        description = "Delete specific observations from entities.\n\nEach deletion should have 'entityName' and 'observations' (list of exact\nfact texts to remove). Removes facts entirely regardless of temporal state;\nto close a fact while keeping history, supersede it via add_observations\ninstead. Silently ignores missing entities or observations.",
         input_schema = objects_param_schema("deletions")
     )]
     async fn delete_observations(
@@ -433,7 +580,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Read the entire knowledge graph.\n\nReturns all entities and relations for the authenticated user.\nEntities include 'createdAt' and 'lastUpdated' timestamps (null for legacy data).",
+        description = "Read the entire knowledge graph.\n\nReturns all entities and relations for the authenticated user.\nEntities include 'createdAt' and 'lastUpdated' timestamps (null for legacy\ndata); observations are fact objects {text, validFrom?, validTo?,\nrecordedAt?, source?}.",
         input_schema = no_params_schema()
     )]
     async fn read_graph(&self, Extension(parts): Extension<Parts>) -> CallToolResult {
@@ -444,7 +591,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Search for nodes in the knowledge graph.\n\nPerforms case-insensitive search across entity names, types, and observations.\nReturns matching entities (with 'createdAt'/'lastUpdated' timestamps) and any\nrelations where at least one endpoint matches.",
+        description = "Search for nodes in the knowledge graph.\n\nPerforms case-insensitive search across entity names, types, and observation\ntext. Returns matching entities (observations as fact objects) and any\nrelations where at least one endpoint matches. For fact-level temporal\nqueries (as-of, since/until, history) use search_facts instead.",
         input_schema = one_string_schema("query")
     )]
     async fn search_nodes(
@@ -461,7 +608,7 @@ impl MemoryServer {
     }
 
     #[tool(
-        description = "Open specific nodes by name from the knowledge graph.\n\nReturns the requested entities (with 'createdAt'/'lastUpdated' timestamps) and\nany relations where at least one endpoint is in the requested set.",
+        description = "Open specific nodes by name from the knowledge graph.\n\nReturns the requested entities (observations as fact objects, with\n'createdAt'/'lastUpdated' timestamps) and any relations where at least one\nendpoint is in the requested set.",
         input_schema = strings_param_schema("names")
     )]
     async fn open_nodes(

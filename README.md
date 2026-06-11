@@ -5,6 +5,7 @@ A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) se
 ## Features
 
 - **Knowledge graph storage** -- entities, relations, and observations persisted as JSONL
+- **Bitemporal facts** -- each observation carries `validFrom`/`validTo` (when it was true in the world) and `recordedAt` (when the server learned it), with as-of, window, and history queries via `search_facts`
 - **Multi-user support** -- each token maps to its own data file; multiple tokens can share a file for team access
 - **Token-based authentication** -- Bearer tokens with read-only or read-write permission modes
 - **Entity type normalization** -- configurable alias mappings with Title Case fallback
@@ -140,7 +141,7 @@ Optional alias mappings for entity type normalization. When an entity is created
 |---|---|
 | `create_entities` | Create entities with name, type, and observations. Skips duplicates. |
 | `create_relations` | Create directed relations between entities (`from`, `to`, `relationType`). |
-| `add_observations` | Append observations to existing entities. |
+| `add_observations` | Append observations as timestamped facts. Entries are strings or `{text, validFrom?, validTo?, source?, supersedes?}`; `supersedes` closes a prior active fact. |
 | `delete_entities` | Delete entities and cascade-delete their relations. |
 | `delete_observations` | Remove specific observations from entities. |
 | `delete_relations` | Remove specific relations by exact match. |
@@ -153,8 +154,32 @@ Optional alias mappings for entity type normalization. When an entity is created
 | Tool | Description |
 |---|---|
 | `read_graph` | Return the full knowledge graph (entities and relations). |
-| `search_nodes` | Case-insensitive search across entity names, types, and observations. |
+| `search_nodes` | Case-insensitive search across entity names, types, and observation text. |
 | `open_nodes` | Retrieve specific entities by name with their related relations. |
+| `search_facts` | Fact-level temporal search: `query` (substring), `entityName`, `asOf` (truth at an instant), `since`/`until` (window on `validFrom`), `includeSuperseded`, `order` (`desc`/`asc`), `limit`. Active facts only by default. |
+
+### Temporal model
+
+Observations are bitemporal facts. `validFrom` is when the fact became true
+in the world (pass the meeting/event date when you know it; defaults to
+write time), `validTo` is null while current and set when superseded,
+`recordedAt` is when the server learned the fact, and `source` is free-form
+provenance. Storage is append-only: facts are never auto-replaced. A writer
+that knows a new fact replaces an old one passes
+`supersedes: "<exact text of the old fact>"`, which closes the old fact's
+validity at the new fact's `validFrom`. The three query shapes:
+
+```jsonc
+// As-of: the standing truth at a date
+{"query": "deploy target", "asOf": "2026-02-01"}
+// Window: what changed since a date
+{"entityName": "Jennifer", "since": "2026-05-01"}
+// History: how a fact evolved
+{"query": "EDC ownership", "includeSuperseded": true, "order": "asc"}
+```
+
+Resolve relative times ("last month") to absolute ISO dates before calling;
+the server only accepts `YYYY-MM-DD` or full ISO-8601.
 
 ## Authentication
 
@@ -174,18 +199,26 @@ To use this server with Claude Desktop or another MCP client, configure it as a 
 
 ## Data Storage
 
-Knowledge graphs are stored as JSONL files (one JSON object per line) in the configured data directory. Each line is either an entity or a relation:
+Knowledge graphs are stored as JSONL files (one JSON object per line) in the configured data directory. Each line is either an entity or a relation. Since v0.4 (format v2), observations are fact objects:
 
 ```jsonl
-{"type": "entity", "name": "Alice", "entityType": "Person", "observations": ["Engineer", "Works on Project X"], "createdAt": "2026-03-23T14:30:00+00:00", "lastUpdated": "2026-03-23T14:30:00+00:00"}
+{"type": "entity", "name": "Alice", "entityType": "Person", "observations": [{"text": "Engineer"}, {"text": "Works on Project X", "validFrom": "2026-03-23", "recordedAt": "2026-03-23T14:30:00+00:00"}], "createdAt": "2026-03-23T14:30:00+00:00", "lastUpdated": "2026-03-23T14:30:00+00:00"}
 {"type": "relation", "from": "Alice", "to": "Project X", "relationType": "worksOn", "createdAt": "2026-03-23T14:30:00+00:00", "lastUpdated": "2026-03-23T14:30:00+00:00"}
 ```
 
+v1 files (observations as plain strings, written by every version up to
+0.3.x) load forever; the first write upgrades the file in place, converting
+legacy strings to `{"text": ...}` with no invented temporal fields. The
+upgrade is one-way: pre-0.4 implementations cannot read v2 files.
+
 ## Differences from the Python implementation (v0.2.x)
 
-The MCP wire contract and data file format are identical — verified by
-`benchmarks/parity_check.py` against captured fixtures, and data files are
-byte-identical modulo timestamps. Intentional differences:
+At v0.3.0 the MCP wire contract and data file format were identical —
+verified by `benchmarks/parity_check.py` against captured fixtures, with
+byte-identical data files modulo timestamps. v0.4.0 deliberately evolved
+both: observations are now fact objects (see Temporal model and Data
+Storage above), pinned by the `fixtures/rust-v0.4.0/` fixtures. The
+remaining v0.3-era differences:
 
 - **Auth**: `MEMORY_TOKEN` env fallback removed; token comparison is
   constant-time.

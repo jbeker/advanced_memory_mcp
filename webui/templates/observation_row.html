@@ -1,10 +1,15 @@
-<li class="obs">
-  <span class="obs-text">{{ obs }}</span>
+<li class="obs{% if obs.validTo %} superseded{% endif %}">
+  <span class="obs-text">{{ obs.text }}</span>
+  <span class="obs-meta">
+    {% if obs.validFrom %}<span class="muted" title="valid from {{ obs.validFrom }}">{{ obs.validFrom|datepart }}</span>{% endif %}
+    {% if obs.validTo %}<span class="badge-superseded" title="superseded {{ obs.validTo }}">superseded</span>{% endif %}
+    {% if obs.source %}<span class="muted" title="source">{{ obs.source }}</span>{% endif %}
+  </span>
   {% if not read_only %}
   <span class="obs-actions">
     <button class="link"
             hx-post="/ui/api/observations/delete"
-            hx-vals='{"entity": "{{ entity.name|e }}", "text": {{ obs|tojson }}}'
+            hx-vals='{"entity": "{{ entity.name|e }}", "text": {{ obs.text|tojson }}}'
             hx-confirm="Delete this observation?"
             hx-target="closest li"
             hx-swap="outerHTML"

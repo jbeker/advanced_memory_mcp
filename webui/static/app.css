@@ -201,3 +201,14 @@ li.obs:hover { background: rgba(127,127,127,0.05); }
   .relations { grid-template-columns: 1fr; }
   .filters input[type="search"] { min-width: 0; flex: 1; }
 }
+
+/* Temporal fact metadata */
+.obs-meta { display: inline-flex; gap: 8px; margin-left: 8px; font-size: 0.85em; align-items: baseline; }
+.obs.superseded .obs-text { opacity: 0.55; text-decoration: line-through; }
+.badge-superseded {
+  background: var(--warn-bg, #fff4e0);
+  border: 1px solid var(--warn-border, #e0c080);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.85em;
+}

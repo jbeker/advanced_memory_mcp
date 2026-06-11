@@ -2,13 +2,18 @@
 # requires-python = ">=3.11"
 # dependencies = ["mcp>=1.9"]
 # ///
-"""Verify a server against the captured Python v0.2.0 MCP fixtures.
+"""Verify a server against captured MCP fixtures.
 
-Replays benchmarks/fixtures/python-v0.2.0/calls.json (the scripted sequence
-that covers every tool's success and error paths) against a live server and
-diffs each result, plus tools/list metadata, against the recorded ground
-truth. Timestamps differ between runs, so any ISO-8601-shaped string is
-masked before comparison.
+Replays a fixtures directory's calls.json (a scripted sequence covering
+every tool's success and error paths; see capture_fixtures.py) against a
+live server and diffs each result, plus tools/list metadata, against the
+recorded ground truth. Timestamps differ between runs, so any ISO-8601
+datetime is masked before comparison (date-only values like a fact's
+explicit validFrom are deterministic and compared exactly).
+
+The default fixtures pin the current v0.4 contract
+(fixtures/rust-v0.4.0/); fixtures/python-v0.2.0/ remains as the
+historical pre-temporal contract.
 
 The target server must be freshly started on an EMPTY data file with two
 tokens equivalent to the capture run: a read-write one and a read-only one
@@ -19,7 +24,7 @@ Usage:
         --rw-token TOKEN_RW --ro-token TOKEN_RO [--fixtures DIR]
 
 Exits non-zero if any difference is found. Known/accepted differences are
-listed in KNOWN_DIFFS and reported but don't fail the check.
+reported but don't fail the check.
 """
 
 import argparse
@@ -33,7 +38,7 @@ from pathlib import Path
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-DEFAULT_FIXTURES = Path(__file__).parent / "fixtures" / "python-v0.2.0"
+DEFAULT_FIXTURES = Path(__file__).parent / "fixtures" / "rust-v0.4.0"
 
 # Token placeholders used in the captured sequence.
 CAPTURE_RW = "fixtok_rw"
@@ -190,7 +195,7 @@ async def main() -> int:
             print(f"  ... and {len(failures) - 40} more")
         return 1
 
-    print("\nPARITY OK: all tool calls match the Python fixtures")
+    print("\nPARITY OK: all tool calls match the fixtures")
     return 0
 
 

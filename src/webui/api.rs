@@ -125,31 +125,31 @@ pub(super) async fn update_observation(
         Err(resp) => return resp,
     };
 
-    let ok = match store.mutate(|g| {
+    let updated = match store.mutate(|g| {
         Ok::<_, std::io::Error>(g.update_observation(
             &payload.entity,
             &payload.original_text,
             &payload.new_text,
         ))
     }) {
-        Ok(ok) => ok,
+        Ok(updated) => updated,
         Err(e) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     };
-    if !ok {
+    let Some(fact) = updated else {
         return (
             StatusCode::NOT_FOUND,
             Json(json!({"detail": "Entity or observation not found."})),
         )
             .into_response();
-    }
+    };
 
     html(render(
         &ui,
         "observation_row.html",
         context! {
-            obs => payload.new_text,
+            obs => serde_json::to_value(&fact).expect("fact serializes"),
             entity => context! { name => payload.entity },
             read_only => false,
         },

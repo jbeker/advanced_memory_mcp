@@ -47,7 +47,7 @@ fn filter_entities<'a>(
                 || e.entity_type_str().to_lowercase().contains(&q)
                 || e.observations_slice()
                     .iter()
-                    .any(|o| o.to_lowercase().contains(&q))
+                    .any(|f| f.text.to_lowercase().contains(&q))
         })
         .collect()
 }
@@ -210,9 +210,14 @@ pub(super) async fn entity_detail(
         let entity = result.entities.iter().find(|e| e.name == name).cloned();
         entity.map(|e| (e, result.relations))
     });
-    let Some((entity, relations)) = found else {
+    let Some((mut entity, relations)) = found else {
         return StatusCode::NOT_FOUND.into_response();
     };
+    // Display order: active facts first, superseded after (stable within
+    // each group).
+    if let Some(obs) = &mut entity.observations {
+        obs.sort_by_key(|f| !f.is_active());
+    }
 
     let outgoing: Vec<_> = relations
         .iter()

@@ -253,24 +253,57 @@ mod tests {
     use super::*;
     use std::collections::HashMap as Aliases;
 
-    /// A file produced by the Python implementation (real key order, nulls,
-    /// and an extra unknown field) must round-trip byte-identically.
-    const PYTHON_FILE: &str = concat!(
+    /// A v1 file (Python-era: observations as plain strings). Loading is
+    /// supported forever; writing upgrades observations to fact objects.
+    const V1_FILE: &str = concat!(
         "{\"type\": \"entity\", \"name\": \"Alice\", \"entityType\": \"Person\", \"observations\": [\"Likes coffee\", \"Lives in Boston\"], \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-02T00:00:00+00:00\"}\n",
         "{\"type\": \"entity\", \"name\": \"Legacy\", \"entityType\": \"Project\", \"observations\": [], \"createdAt\": null, \"lastUpdated\": null}\n",
         "{\"type\": \"relation\", \"from\": \"Alice\", \"to\": \"Legacy\", \"relationType\": \"worksOn\", \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-01T00:00:00+00:00\"}\n",
     );
 
+    /// The same data in v2 form: each observation is `{"text": ...}` with no
+    /// spurious temporal fields invented during the upgrade.
+    const V2_FILE: &str = concat!(
+        "{\"type\": \"entity\", \"name\": \"Alice\", \"entityType\": \"Person\", \"observations\": [{\"text\": \"Likes coffee\"}, {\"text\": \"Lives in Boston\"}], \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-02T00:00:00+00:00\"}\n",
+        "{\"type\": \"entity\", \"name\": \"Legacy\", \"entityType\": \"Project\", \"observations\": [], \"createdAt\": null, \"lastUpdated\": null}\n",
+        "{\"type\": \"relation\", \"from\": \"Alice\", \"to\": \"Legacy\", \"relationType\": \"worksOn\", \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-01T00:00:00+00:00\"}\n",
+    );
+
     #[test]
-    fn python_file_round_trips_byte_identically() {
+    fn v1_file_upgrades_to_v2_on_write() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("g.jsonl");
-        std::fs::write(&path, PYTHON_FILE).unwrap();
+        std::fs::write(&path, V1_FILE).unwrap();
 
         let graph = load_graph(&path).unwrap();
         assert_eq!(graph.entities.len(), 2);
         assert_eq!(graph.relations.len(), 1);
-        assert_eq!(serialize_graph(&graph), PYTHON_FILE);
+        assert_eq!(serialize_graph(&graph), V2_FILE);
+    }
+
+    #[test]
+    fn v2_file_round_trips_byte_identically() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("g.jsonl");
+        std::fs::write(&path, V2_FILE).unwrap();
+
+        let graph = load_graph(&path).unwrap();
+        assert_eq!(serialize_graph(&graph), V2_FILE);
+    }
+
+    #[test]
+    fn temporal_fact_fields_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("g.jsonl");
+        let line = "{\"type\": \"entity\", \"name\": \"A\", \"entityType\": \"T\", \"observations\": [{\"text\": \"target: April\", \"validFrom\": \"2026-03-01\", \"validTo\": \"2026-04-02\", \"recordedAt\": \"2026-03-01T10:00:00+00:00\", \"source\": \"1:1 notes\"}, {\"text\": \"mixed legacy\"}], \"createdAt\": null, \"lastUpdated\": null}\n";
+        std::fs::write(&path, line).unwrap();
+
+        let graph = load_graph(&path).unwrap();
+        let fact = &graph.entities[0].observations_slice()[0];
+        assert_eq!(fact.valid_from.as_deref(), Some("2026-03-01"));
+        assert_eq!(fact.valid_to.as_deref(), Some("2026-04-02"));
+        assert_eq!(fact.source.as_deref(), Some("1:1 notes"));
+        assert_eq!(serialize_graph(&graph), line);
     }
 
     #[test]
@@ -389,7 +422,7 @@ mod tests {
                                 vec![crate::graph::Entity {
                                     name: format!("Race {i}"),
                                     entity_type: Some("Person".into()),
-                                    observations: Some(vec!["x".into()]),
+                                    observations: Some(vec![crate::graph::Fact::from_text("x")]),
                                     created_at: None,
                                     last_updated: None,
                                     extra: Default::default(),

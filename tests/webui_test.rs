@@ -19,7 +19,7 @@ const RO_TOKEN: &str = "bob_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const UI_SECRET: &str = "test-secret-not-for-production";
 
 const SAMPLE_DATA: &str = concat!(
-    "{\"type\": \"entity\", \"name\": \"Alice\", \"entityType\": \"Person\", \"observations\": [\"Likes coffee\", \"Lives in Boston\"], \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-02T00:00:00+00:00\"}\n",
+    "{\"type\": \"entity\", \"name\": \"Alice\", \"entityType\": \"Person\", \"observations\": [\"Likes coffee\", \"Lives in Boston\", {\"text\": \"old role: IC\", \"validFrom\": \"2025-06-01\", \"validTo\": \"2026-01-15\"}, {\"text\": \"new role: manager\", \"validFrom\": \"2026-01-15\"}], \"createdAt\": \"2026-01-01T00:00:00+00:00\", \"lastUpdated\": \"2026-01-02T00:00:00+00:00\"}\n",
     "{\"type\": \"entity\", \"name\": \"Bob\", \"entityType\": \"Person\", \"observations\": [\"Plays chess\"], \"createdAt\": null, \"lastUpdated\": null}\n",
     "{\"type\": \"entity\", \"name\": \"Project X\", \"entityType\": \"Project\", \"observations\": [], \"createdAt\": null, \"lastUpdated\": null}\n",
     "{\"type\": \"relation\", \"from\": \"Alice\", \"to\": \"Project X\", \"relationType\": \"worksOn\", \"createdAt\": null, \"lastUpdated\": null}\n",
@@ -229,6 +229,31 @@ async fn entity_detail_splits_relations() {
     assert!(body.contains("Likes coffee"));
     assert!(body.contains("worksOn")); // outgoing
     assert!(body.contains("knows")); // incoming from Bob
+}
+
+#[tokio::test]
+async fn entity_detail_shows_temporal_badges_active_first() {
+    let t = test_app();
+    let cookie = session_cookie(RW_TOKEN);
+    let (_, _, body) = send(&t.app, get("/ui/entity/Alice", Some(&cookie))).await;
+    // Superseded fact gets a badge and the date chip shows the date part.
+    assert!(body.contains("old role: IC"));
+    assert!(body.contains("badge-superseded"));
+    assert!(body.contains("2026-01-15"));
+    // Active facts render before superseded ones.
+    let active = body.find("new role: manager").unwrap();
+    let superseded = body.find("old role: IC").unwrap();
+    assert!(active < superseded);
+    // Legacy (string) facts render their text without badges.
+    assert!(body.contains("Likes coffee"));
+}
+
+#[tokio::test]
+async fn search_matches_temporal_fact_text() {
+    let t = test_app();
+    let cookie = session_cookie(RW_TOKEN);
+    let (_, _, body) = send(&t.app, get("/ui/search?q=manager", Some(&cookie))).await;
+    assert!(body.contains("Alice"));
 }
 
 #[tokio::test]

@@ -57,6 +57,11 @@ impl WebUi {
     pub fn new(state: Arc<AppState>, ui_secret: String) -> Self {
         let mut templates = minijinja::Environment::new();
         templates.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
+        // Render just the date part of a fact timestamp (validFrom may be a
+        // bare date or a full ISO instant).
+        templates.add_filter("datepart", |value: String| {
+            value.chars().take(10).collect::<String>()
+        });
         for (name, source) in TEMPLATES {
             templates
                 .add_template(name, source)

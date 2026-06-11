@@ -1,6 +1,6 @@
 [package]
 name = "advanced-memory-mcp"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Multi-user MCP memory server (Rust reimplementation)"
 license = "LicenseRef-Proprietary"

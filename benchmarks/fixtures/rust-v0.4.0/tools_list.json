@@ -1,0 +1,382 @@
+{
+  "meta": null,
+  "nextCursor": null,
+  "tools": [
+    {
+      "name": "add_observations",
+      "title": null,
+      "description": "Add new observations (timestamped facts) to existing entities.\n\nEach observation has 'entityName' and 'contents': a list where each entry is\neither a plain string or an object {text, validFrom?, validTo?, source?,\nsupersedes?}. validFrom is when the fact became true in the world (e.g. the\nmeeting date, YYYY-MM-DD or ISO-8601) and defaults to write time; recordedAt\nis always set to write time. 'supersedes' names the exact text of an active\nfact on the same entity to close (its validTo becomes the new fact's\nvalidFrom) - it errors if the target is missing or already superseded.\nDeduplicates by text. Returns error if entity doesn't exist.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "observations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "observations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "create_entities",
+      "title": null,
+      "description": "Create multiple new entities in the knowledge graph.\n\nEach entity should have 'name', 'entityType', and 'observations' fields.\nObservation entries may be plain strings or fact objects {text, validFrom,\nvalidTo, recordedAt, source}; they are stored as given (use add_observations\nfor write-time temporal defaults). Deduplicates by entity name - existing\nentities are skipped. New entities receive 'createdAt' and 'lastUpdated'\nISO 8601 UTC timestamps.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "entities": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entities"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "create_relations",
+      "title": null,
+      "description": "Create multiple new relations between entities.\n\nEach relation should have 'from', 'to', and 'relationType' fields.\nDeduplicates by the (from, to, relationType) tuple.\nNew relations receive 'createdAt' and 'lastUpdated' ISO 8601 UTC timestamps.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "relations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "delete_entities",
+      "title": null,
+      "description": "Delete entities and their associated relations from the knowledge graph.\n\nTakes a list of entity names to delete. Relations involving deleted entities\nare also removed (cascade delete).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "entityNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "entityNames"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "delete_observations",
+      "title": null,
+      "description": "Delete specific observations from entities.\n\nEach deletion should have 'entityName' and 'observations' (list of exact\nfact texts to remove). Removes facts entirely regardless of temporal state;\nto close a fact while keeping history, supersede it via add_observations\ninstead. Silently ignores missing entities or observations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deletions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "deletions"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "delete_relations",
+      "title": null,
+      "description": "Delete specific relations from the knowledge graph.\n\nEach relation should have 'from', 'to', and 'relationType' fields.\nAll three fields must match for deletion.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "relations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "merge_entities",
+      "title": null,
+      "description": "Merge the source entity into the target entity.\n\nThe source is removed; the target absorbs the source's observations\n(unioned, target order preserved) and relations (re-pointed, self-loops\ndropped, duplicates collapsed keeping the earliest createdAt). Target's\nentityType is kept; if source's entityType differed it is returned as\n'discardedType' in the response. createdAt becomes the earliest non-null\nof the two. Errors if either entity is missing or source == target.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "normalize_entity_types",
+      "title": null,
+      "description": "Normalize all entity types in the knowledge graph using configured aliases.\n\nApplies type alias mappings and Title Case normalization to all existing entities.\nReturns a summary of changes made. Read-only tokens are rejected.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "open_nodes",
+      "title": null,
+      "description": "Open specific nodes by name from the knowledge graph.\n\nReturns the requested entities (observations as fact objects, with\n'createdAt'/'lastUpdated' timestamps) and any relations where at least one\nendpoint is in the requested set.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "read_graph",
+      "title": null,
+      "description": "Read the entire knowledge graph.\n\nReturns all entities and relations for the authenticated user.\nEntities include 'createdAt' and 'lastUpdated' timestamps (null for legacy\ndata); observations are fact objects {text, validFrom?, validTo?,\nrecordedAt?, source?}.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "rename_entity",
+      "title": null,
+      "description": "Rename an entity in the knowledge graph.\n\nUpdates the entity's name and rewrites every relation that references it\n(both 'from' and 'to' endpoints). Errors if the source entity is not found,\nif an entity with 'new_name' already exists (use merge_entities to combine\nthem), or if name == new_name. Bumps lastUpdated on the entity and on every\ntouched relation. Returns {renamed: {from, to}, relationsUpdated: N}.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "new_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "new_name"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "search_facts",
+      "title": null,
+      "description": "Search observations as timestamped facts with temporal filters.\n\nAll parameters are optional and combine as AND filters:\n- query: case-insensitive substring matched against fact text\n- entityName: exact entity filter\n- asOf: return facts valid at that instant (validFrom <= asOf < validTo);\n  facts without validFrom count as always valid\n- since/until: window on validFrom; facts without validFrom are excluded\n- includeSuperseded: include facts whose validity ended (default false;\n  implied by asOf)\n- order: 'desc' (default, newest validFrom first) or 'asc' (history order);\n  facts without validFrom sort last\n- limit: max facts returned (default 20)\nDates are YYYY-MM-DD or ISO-8601; resolve relative times before calling.\nReturns {facts: [{entityName, text, validFrom, validTo, recordedAt,\nsource}], total} where total counts matches before the limit.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "case-insensitive substring on fact text"
+          },
+          "entityName": {
+            "type": "string",
+            "description": "exact entity name filter"
+          },
+          "asOf": {
+            "type": "string",
+            "description": "facts valid at this instant (YYYY-MM-DD or ISO-8601)"
+          },
+          "since": {
+            "type": "string",
+            "description": "validFrom >= since"
+          },
+          "until": {
+            "type": "string",
+            "description": "validFrom <= until"
+          },
+          "includeSuperseded": {
+            "type": "boolean",
+            "description": "include facts whose validity ended (default false)"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "desc",
+              "asc"
+            ],
+            "description": "validFrom ordering (default desc)"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "max facts returned (default 20)"
+          }
+        },
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    },
+    {
+      "name": "search_nodes",
+      "title": null,
+      "description": "Search for nodes in the knowledge graph.\n\nPerforms case-insensitive search across entity names, types, and observation\ntext. Returns matching entities (observations as fact objects) and any\nrelations where at least one endpoint matches. For fact-level temporal\nqueries (as-of, since/until, history) use search_facts instead.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "icons": null,
+      "annotations": null,
+      "meta": null,
+      "execution": null
+    }
+  ]
+}
