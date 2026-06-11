@@ -81,6 +81,15 @@ docker-compose up -d
 `MEMORY_UI_SECRET` signs web UI session cookies; if unset, an ephemeral
 secret is generated and sessions reset on restart.
 
+### Health check
+
+`GET /health` is unauthenticated and returns
+`{"status": "ok", "version": "..."}` — liveness only, no graph state.
+`advanced-memory-mcp --health-check` probes it from inside the container
+(honoring `MCP_HOST`/`MCP_PORT`, probing loopback when bound to 0.0.0.0)
+and exits 0/1; the Dockerfile registers it as the image's `HEALTHCHECK`,
+so `docker ps` and compose report container health with no extra tooling.
+
 ### tokens.json
 
 Maps bearer tokens to data files and permission levels:

@@ -31,4 +31,7 @@ VOLUME /data
 VOLUME /config
 EXPOSE 8765
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD ["advanced-memory-mcp", "--health-check"]
+
 ENTRYPOINT ["advanced-memory-mcp"]

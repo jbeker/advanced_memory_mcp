@@ -25,13 +25,13 @@ struct Args {
     #[arg(long, env = "MCP_PORT", default_value_t = 8765)]
     port: u16,
 
-    /// Directory for per-user JSONL data files
-    #[arg(long, env = "MCP_DATA_DIR", required = true)]
-    data_dir: PathBuf,
+    /// Directory for per-user JSONL data files (required unless --health-check)
+    #[arg(long, env = "MCP_DATA_DIR")]
+    data_dir: Option<PathBuf>,
 
-    /// Path to tokens.json config file
-    #[arg(long, env = "MCP_TOKEN_CONFIG", required = true)]
-    token_config: PathBuf,
+    /// Path to tokens.json config file (required unless --health-check)
+    #[arg(long, env = "MCP_TOKEN_CONFIG")]
+    token_config: Option<PathBuf>,
 
     /// Path to entity_types.json config file
     #[arg(long, env = "MCP_TYPE_CONFIG")]
@@ -41,6 +41,11 @@ struct Args {
     /// streamable HTTP transport. "sse" is no longer supported.)
     #[arg(long, env = "MCP_TRANSPORT", default_value = "http")]
     transport: String,
+
+    /// Probe the running server's /health endpoint and exit 0/1.
+    /// Used as the Docker HEALTHCHECK command.
+    #[arg(long)]
+    health_check: bool,
 }
 
 fn load_aliases(path: Option<&PathBuf>) -> anyhow::Result<HashMap<String, String>> {
@@ -72,6 +77,29 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
+    if args.health_check {
+        // A 0.0.0.0 bind address isn't connectable; probe loopback instead.
+        let host = if args.host == "0.0.0.0" { "127.0.0.1" } else { &args.host };
+        return match advanced_memory_mcp::health::probe(
+            host,
+            args.port,
+            std::time::Duration::from_secs(3),
+        ) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                eprintln!("health check failed: {e}");
+                std::process::exit(1);
+            }
+        };
+    }
+
+    let Some(data_dir) = args.data_dir else {
+        anyhow::bail!("--data-dir is required (or set MCP_DATA_DIR)");
+    };
+    let Some(token_config) = args.token_config else {
+        anyhow::bail!("--token-config is required (or set MCP_TOKEN_CONFIG)");
+    };
+
     match args.transport.as_str() {
         "http" | "streamable-http" => {}
         "sse" => anyhow::bail!(
@@ -80,9 +108,9 @@ async fn main() -> anyhow::Result<()> {
         other => anyhow::bail!("unknown transport '{other}'; use 'http' or 'streamable-http'"),
     }
 
-    let tokens = TokenConfig::load(&args.token_config).map_err(anyhow::Error::msg)?;
+    let tokens = TokenConfig::load(&token_config).map_err(anyhow::Error::msg)?;
     let aliases = load_aliases(args.type_config.as_ref())?;
-    std::fs::create_dir_all(&args.data_dir)?;
+    std::fs::create_dir_all(&data_dir)?;
 
     tracing::info!("{SERVER_NAME} v{} (rust)", env!("CARGO_PKG_VERSION"));
     tracing::info!(
@@ -90,11 +118,11 @@ async fn main() -> anyhow::Result<()> {
         args.host,
         args.port
     );
-    tracing::info!("Data dir: {}", args.data_dir.display());
+    tracing::info!("Data dir: {}", data_dir.display());
     tracing::info!("Type aliases loaded: {}", aliases.len());
 
     let state = Arc::new(AppState {
-        stores: StoreMap::new(args.data_dir.clone()),
+        stores: StoreMap::new(data_dir.clone()),
         tokens,
         aliases,
     });
@@ -125,7 +153,8 @@ async fn main() -> anyhow::Result<()> {
 
     let router = axum::Router::new()
         .nest_service("/mcp", mcp_service)
-        .merge(advanced_memory_mcp::webui::router(state.clone(), ui_secret));
+        .merge(advanced_memory_mcp::webui::router(state.clone(), ui_secret))
+        .merge(advanced_memory_mcp::health::router());
     tracing::info!("Web UI available at /ui/");
 
     let listener = tokio::net::TcpListener::bind((args.host.as_str(), args.port)).await?;
