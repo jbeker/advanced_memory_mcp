@@ -5,5 +5,6 @@
 //! captured contract); storage is in-memory with atomic file persistence.
 
 pub mod graph;
+pub mod mcp;
 pub mod store;
 pub mod tokens;

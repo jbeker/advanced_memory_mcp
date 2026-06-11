@@ -115,7 +115,7 @@ pub fn serialize_graph(graph: &Graph) -> String {
 /// keep data files byte-identical with the Python implementation.
 fn python_style_json<T: Serialize>(value: &T) -> String {
     let mut buf = Vec::new();
-    let formatter = PythonFormatter::default();
+    let formatter = PythonFormatter;
     let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
     value.serialize(&mut ser).expect("graph serialization cannot fail");
     String::from_utf8(buf).expect("serde_json output is UTF-8")
