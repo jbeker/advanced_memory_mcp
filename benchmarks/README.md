@@ -43,3 +43,23 @@ server's storage layer. The script exits non-zero if any loss is detected.
 All numbers are median/min/max milliseconds over `--repeats` calls (default
 10), written to stdout as a table and optionally to `--json` for cross-version
 comparison.
+
+## Baseline results
+
+`results/` holds committed runs for comparing implementations. Name files
+`<implementation>-v<version>.json`.
+
+`results/python-v0.2.0.json` is the Python server at v0.2.0 on an Apple
+Silicon Mac (local loopback, 2026-06-11). Highlights:
+
+| entities | search_nodes | open_nodes | read_graph | create_entities(1) |
+|---------:|-------------:|-----------:|-----------:|-------------------:|
+|      100 |       4.4 ms |     4.0 ms |     7.2 ms |             4.3 ms |
+|    1,000 |        10 ms |     6.5 ms |      32 ms |              12 ms |
+|   10,000 |        73 ms |      40 ms |     308 ms |              80 ms |
+
+Latency grows linearly with graph size because every operation re-reads, and
+every write rewrites, the whole JSONL file. The race check failed: 40
+concurrent creates produced 39 errors and corrupted the store (NUL bytes and
+truncated lines), after which all reads failed. Any refresh should beat both
+the latency curve and the race check.

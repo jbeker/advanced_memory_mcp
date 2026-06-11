@@ -1,0 +1,130 @@
+{
+  "url": "http://127.0.0.1:8799/mcp",
+  "timestamp": "2026-06-11T16:21:21.693770+00:00",
+  "repeats": 10,
+  "sizes": [
+    {
+      "size": 100,
+      "seed_seconds": 0.0,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 4.434,
+          "min_ms": 4.075,
+          "max_ms": 5.692
+        },
+        "open_nodes": {
+          "median_ms": 3.985,
+          "min_ms": 3.572,
+          "max_ms": 5.312
+        },
+        "read_graph": {
+          "median_ms": 7.186,
+          "min_ms": 5.848,
+          "max_ms": 7.744
+        },
+        "create_entities_1": {
+          "median_ms": 4.336,
+          "min_ms": 4.088,
+          "max_ms": 4.901
+        },
+        "add_observations_1": {
+          "median_ms": 4.126,
+          "min_ms": 3.733,
+          "max_ms": 4.65
+        },
+        "create_relations_1": {
+          "median_ms": 4.238,
+          "min_ms": 3.812,
+          "max_ms": 6.485
+        }
+      }
+    },
+    {
+      "size": 1000,
+      "seed_seconds": 0.1,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 10.068,
+          "min_ms": 9.731,
+          "max_ms": 10.54
+        },
+        "open_nodes": {
+          "median_ms": 6.446,
+          "min_ms": 5.968,
+          "max_ms": 6.843
+        },
+        "read_graph": {
+          "median_ms": 32.212,
+          "min_ms": 31.142,
+          "max_ms": 374.679
+        },
+        "create_entities_1": {
+          "median_ms": 11.798,
+          "min_ms": 11.324,
+          "max_ms": 12.356
+        },
+        "add_observations_1": {
+          "median_ms": 10.927,
+          "min_ms": 10.205,
+          "max_ms": 12.084
+        },
+        "create_relations_1": {
+          "median_ms": 10.975,
+          "min_ms": 10.4,
+          "max_ms": 11.4
+        }
+      }
+    },
+    {
+      "size": 10000,
+      "seed_seconds": 2.3,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 72.524,
+          "min_ms": 71.289,
+          "max_ms": 91.943
+        },
+        "open_nodes": {
+          "median_ms": 40.371,
+          "min_ms": 37.65,
+          "max_ms": 71.851
+        },
+        "read_graph": {
+          "median_ms": 307.742,
+          "min_ms": 296.805,
+          "max_ms": 340.3
+        },
+        "create_entities_1": {
+          "median_ms": 79.582,
+          "min_ms": 77.904,
+          "max_ms": 96.867
+        },
+        "add_observations_1": {
+          "median_ms": 82.971,
+          "min_ms": 79.658,
+          "max_ms": 105.047
+        },
+        "create_relations_1": {
+          "median_ms": 82.845,
+          "min_ms": 81.56,
+          "max_ms": 101.942
+        }
+      }
+    }
+  ],
+  "race": {
+    "sent": 40,
+    "acknowledged": 2,
+    "call_errors": 39,
+    "error_samples": [
+      "RuntimeError: tool call failed: Error calling tool 'create_entities': Expecting value: line 1 column 1 (char 0)",
+      "RuntimeError: tool call failed: Error calling tool 'create_entities': Unterminated string starting at: line 1 column 154 (char 153)",
+      "RuntimeError: tool call failed: Error calling tool 'create_entities': Unterminated string starting at: line 1 column 218 (char 217)"
+    ],
+    "store_readable": false,
+    "survived": null,
+    "lost_after_ack": null,
+    "elapsed_s": 1.52
+  },
+  "tool_count": 12
+}
