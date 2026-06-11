@@ -5,3 +5,4 @@ memory.json
 tokens.json
 .superpowers/
 .pytest_cache/
+/target

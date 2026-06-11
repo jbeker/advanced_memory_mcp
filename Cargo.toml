@@ -1,0 +1,49 @@
+[package]
+name = "advanced-memory-mcp"
+version = "0.3.0"
+edition = "2021"
+description = "Multi-user MCP memory server (Rust reimplementation)"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[[bin]]
+name = "advanced-memory-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "1.7", features = [
+    "server",
+    "macros",
+    "schemars",
+    "transport-streamable-http-server",
+] }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+http = "1"
+serde = { version = "1", features = ["derive"] }
+# preserve_order keeps JSON object key order insertion-ordered, matching
+# Python's json.dumps output for tool results and data file lines.
+serde_json = { version = "1", features = ["preserve_order"] }
+schemars = "1.0"
+clap = { version = "4", features = ["derive", "env"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+minijinja = "2"
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+base64 = "0.22"
+rand = "0.9"
+percent-encoding = "2"
+thiserror = "2"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+reqwest = { version = "0.12", features = ["json"] }
+
+[profile.release]
+lto = true
+strip = true
