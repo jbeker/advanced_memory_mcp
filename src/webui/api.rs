@@ -1,6 +1,6 @@
 //! htmx mutation endpoints and JSON API. Port of `webui/api.py`.
 
-use super::views::{parse_depth, ui_entity};
+use super::views::parse_depth;
 use super::{WebUi, current_user_or_401, html, render};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};

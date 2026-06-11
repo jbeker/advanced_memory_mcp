@@ -152,8 +152,15 @@ async fn offsite_next_is_replaced() {
 #[tokio::test]
 async fn tampered_cookie_is_rejected() {
     let t = test_app();
-    let cookie = session_cookie(RW_TOKEN).replace('a', "b");
-    let (status, _, _) = send(&t.app, get("/ui/", Some(&cookie))).await;
+    // Flip the final signature character to a different base64url symbol so
+    // the cookie is always altered regardless of its random content.
+    let cookie = session_cookie(RW_TOKEN);
+    let last = cookie.chars().last().unwrap();
+    let flipped = if last == 'A' { 'B' } else { 'A' };
+    let mut tampered = cookie;
+    tampered.pop();
+    tampered.push(flipped);
+    let (status, _, _) = send(&t.app, get("/ui/", Some(&tampered))).await;
     assert_eq!(status, StatusCode::SEE_OTHER);
 }
 

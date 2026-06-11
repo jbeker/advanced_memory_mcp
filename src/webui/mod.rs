@@ -1,6 +1,11 @@
 //! Web UI: same routes and templates as the Python `webui` package, served
 //! by the same binary as the MCP endpoint. Templates and static assets are
 //! embedded at compile time (no filesystem access, no traversal surface).
+//!
+//! Handler helpers return `Result<_, Response>` so auth/permission gates can
+//! short-circuit with the right status; the Err size lint isn't worth boxing
+//! over in request-scoped code.
+#![allow(clippy::result_large_err)]
 
 pub mod auth;
 mod api;
@@ -10,7 +15,7 @@ use crate::mcp::AppState;
 use crate::store::Store;
 use auth::CurrentUser;
 use axum::Router;
-use axum::extract::{Path, State};
+use axum::extract::Path;
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{delete, get, patch, post};
