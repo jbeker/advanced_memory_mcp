@@ -1,6 +1,6 @@
 # Advanced Memory MCP
 
-A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that provides persistent knowledge graph management. This branch is the **Rust implementation** (v0.3.x): the same MCP tool surface and data file formats as the Python v0.2.x server, reimplemented for speed and safety. The Python sources remain in the tree for reference and parity testing.
+A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that provides persistent knowledge graph management, written in Rust. v0.3.x preserves the exact MCP tool surface and data file formats of the retired Python v0.2.x implementation (the wire contract is pinned by `benchmarks/fixtures/python-v0.2.0/`), reimplemented for speed and safety.
 
 ## Features
 
