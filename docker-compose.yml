@@ -15,6 +15,9 @@ services:
       - MCP_TOKEN_CONFIG=/config/tokens.json
       - MCP_TYPE_CONFIG=/config/entity_types.json
       - MCP_TRANSPORT=http
+      # Hosts clients may address this server as (DNS-rebinding protection).
+      # Comma-separated; leave unset to accept any Host header.
+      - MCP_ALLOWED_HOSTS=memory.confusticate.com,localhost,127.0.0.1
     restart: unless-stopped
 
 volumes:

@@ -77,6 +77,7 @@ docker-compose up -d
 | `--token-config` | `MCP_TOKEN_CONFIG` | *(required)* | Path to `tokens.json` |
 | `--type-config` | `MCP_TYPE_CONFIG` | *(none)* | Path to `entity_types.json` |
 | `--transport` | `MCP_TRANSPORT` | `http` | `http` or `streamable-http` (aliases for the MCP streamable HTTP transport; the deprecated `sse` transport was removed) |
+| `--allowed-hosts` | `MCP_ALLOWED_HOSTS` | *(none)* | Comma-separated Host headers to accept on /mcp (DNS-rebinding protection). Unset accepts any Host. Set it to your public hostname when deploying, e.g. `memory.example.com,localhost` |
 
 `MEMORY_UI_SECRET` signs web UI session cookies; if unset, an ephemeral
 secret is generated and sessions reset on restart.

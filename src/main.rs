@@ -42,6 +42,13 @@ struct Args {
     #[arg(long, env = "MCP_TRANSPORT", default_value = "http")]
     transport: String,
 
+    /// Comma-separated Host headers to accept (DNS-rebinding protection),
+    /// e.g. "memory.example.com,localhost". Empty (the default) accepts any
+    /// Host, matching the Python implementation; MCP calls are still
+    /// bearer-token authenticated either way.
+    #[arg(long, env = "MCP_ALLOWED_HOSTS", value_delimiter = ',', num_args = 0..)]
+    allowed_hosts: Vec<String>,
+
     /// Probe the running server's /health endpoint and exit 0/1.
     /// Used as the Docker HEALTHCHECK command.
     #[arg(long)]
@@ -127,14 +134,34 @@ async fn main() -> anyhow::Result<()> {
         aliases,
     });
 
+    let allowed_hosts: Vec<String> = args
+        .allowed_hosts
+        .iter()
+        .map(|h| h.trim().to_string())
+        .filter(|h| !h.is_empty())
+        .collect();
+    if allowed_hosts.is_empty() {
+        tracing::info!("Host header validation: disabled (set MCP_ALLOWED_HOSTS to enable)");
+    } else {
+        tracing::info!("Host header validation: {}", allowed_hosts.join(", "));
+    }
+
     let ct = tokio_util::sync::CancellationToken::new();
     let mcp_state = state.clone();
+    let mut mcp_config = StreamableHttpServerConfig::default()
+        .with_stateful_mode(false)
+        .with_cancellation_token(ct.child_token());
+    mcp_config = if allowed_hosts.is_empty() {
+        // rmcp defaults to localhost-only, which rejects any reverse-proxied
+        // or remote deployment; empty means accept any Host, like Python.
+        mcp_config.disable_allowed_hosts()
+    } else {
+        mcp_config.with_allowed_hosts(allowed_hosts)
+    };
     let mcp_service = StreamableHttpService::new(
         move || Ok(MemoryServer::new(mcp_state.clone())),
         LocalSessionManager::default().into(),
-        StreamableHttpServerConfig::default()
-            .with_stateful_mode(false)
-            .with_cancellation_token(ct.child_token()),
+        mcp_config,
     );
 
     let ui_secret = match std::env::var("MEMORY_UI_SECRET") {
