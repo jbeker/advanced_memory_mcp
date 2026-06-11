@@ -1,0 +1,162 @@
+{
+  "url": "http://127.0.0.1:8796/mcp",
+  "timestamp": "2026-06-11T17:29:15.776744+00:00",
+  "repeats": 10,
+  "sizes": [
+    {
+      "size": 100,
+      "seed_seconds": 0.0,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 1.769,
+          "min_ms": 1.577,
+          "max_ms": 2.164
+        },
+        "open_nodes": {
+          "median_ms": 1.533,
+          "min_ms": 1.386,
+          "max_ms": 1.671
+        },
+        "read_graph": {
+          "median_ms": 2.83,
+          "min_ms": 2.753,
+          "max_ms": 3.079
+        },
+        "create_entities_1": {
+          "median_ms": 6.689,
+          "min_ms": 5.952,
+          "max_ms": 7.37
+        },
+        "add_observations_1": {
+          "median_ms": 6.87,
+          "min_ms": 6.188,
+          "max_ms": 7.258
+        },
+        "create_relations_1": {
+          "median_ms": 6.747,
+          "min_ms": 6.008,
+          "max_ms": 7.806
+        }
+      }
+    },
+    {
+      "size": 1000,
+      "seed_seconds": 0.1,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 3.375,
+          "min_ms": 3.086,
+          "max_ms": 3.596
+        },
+        "open_nodes": {
+          "median_ms": 1.66,
+          "min_ms": 1.482,
+          "max_ms": 1.787
+        },
+        "read_graph": {
+          "median_ms": 15.307,
+          "min_ms": 15.074,
+          "max_ms": 16.348
+        },
+        "create_entities_1": {
+          "median_ms": 8.222,
+          "min_ms": 7.579,
+          "max_ms": 9.988
+        },
+        "add_observations_1": {
+          "median_ms": 8.153,
+          "min_ms": 7.31,
+          "max_ms": 9.053
+        },
+        "create_relations_1": {
+          "median_ms": 8.248,
+          "min_ms": 7.481,
+          "max_ms": 9.549
+        }
+      }
+    },
+    {
+      "size": 10000,
+      "seed_seconds": 0.8,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 17.862,
+          "min_ms": 17.125,
+          "max_ms": 19.054
+        },
+        "open_nodes": {
+          "median_ms": 1.733,
+          "min_ms": 1.655,
+          "max_ms": 2.115
+        },
+        "read_graph": {
+          "median_ms": 147.867,
+          "min_ms": 136.957,
+          "max_ms": 161.519
+        },
+        "create_entities_1": {
+          "median_ms": 20.936,
+          "min_ms": 19.956,
+          "max_ms": 25.908
+        },
+        "add_observations_1": {
+          "median_ms": 20.435,
+          "min_ms": 20.016,
+          "max_ms": 21.758
+        },
+        "create_relations_1": {
+          "median_ms": 21.307,
+          "min_ms": 20.449,
+          "max_ms": 22.567
+        }
+      }
+    },
+    {
+      "size": 50000,
+      "seed_seconds": 10.6,
+      "tools": {
+        "search_nodes": {
+          "median_ms": 27.058,
+          "min_ms": 25.433,
+          "max_ms": 33.859
+        },
+        "open_nodes": {
+          "median_ms": 3.167,
+          "min_ms": 3.007,
+          "max_ms": 3.913
+        },
+        "read_graph": {
+          "median_ms": 768.808,
+          "min_ms": 728.747,
+          "max_ms": 852.851
+        },
+        "create_entities_1": {
+          "median_ms": 80.35,
+          "min_ms": 79.007,
+          "max_ms": 91.336
+        },
+        "add_observations_1": {
+          "median_ms": 81.105,
+          "min_ms": 79.755,
+          "max_ms": 81.809
+        },
+        "create_relations_1": {
+          "median_ms": 85.457,
+          "min_ms": 84.685,
+          "max_ms": 93.617
+        }
+      }
+    }
+  ],
+  "race": {
+    "sent": 40,
+    "acknowledged": 40,
+    "call_errors": 0,
+    "error_samples": [],
+    "store_readable": true,
+    "survived": 40,
+    "lost_after_ack": 0,
+    "elapsed_s": 3.73
+  },
+  "tool_count": 12
+}

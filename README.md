@@ -1,6 +1,6 @@
 # Advanced Memory MCP
 
-A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that provides persistent knowledge graph management. Built with [FastMCP](https://github.com/jlowin/fastmcp), it enables Claude and other MCP clients to store and query structured knowledge with per-user data isolation and token-based access control.
+A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that provides persistent knowledge graph management. This branch is the **Rust implementation** (v0.3.x): the same MCP tool surface and data file formats as the Python v0.2.x server, reimplemented for speed and safety. The Python sources remain in the tree for reference and parity testing.
 
 ## Features
 
@@ -10,36 +10,42 @@ A multi-user [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) se
 - **Entity type normalization** -- configurable alias mappings with Title Case fallback
 - **Automatic timestamps** -- ISO 8601 UTC `createdAt` and `lastUpdated` on all entities and relations
 - **Deduplication** -- entities deduplicated by name, relations by `(from, to, relationType)` tuple
-- **Stateless HTTP mode** -- survives server restarts; supports horizontal scaling
-- **Docker-ready** -- Dockerfile and docker-compose configuration included
+- **In-memory storage engine** -- each data file is loaded once and served from memory; mutations persist via temp-file + fsync + atomic rename, so concurrent writes cannot corrupt the store
+- **Web UI** -- entity browser, search, and graph view served from the same binary at `/ui/`
+- **Docker-ready** -- multi-stage Dockerfile (82 MB image) and docker-compose configuration included
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) package manager
+- Rust toolchain (stable)
 
 ### Install and Run
 
 ```bash
-# Install dependencies
-uv sync
-
-# Generate a token
-python generate_token.py myuser \
+# Generate a token (any way of editing tokens.json works; the Python
+# helper is still included)
+python3 generate_token.py myuser \
   --config tokens.json \
   --file myuser.jsonl \
   --mode read-write
 
-# Start the server
-uv run advanced-memory-mcp \
+# Build and start the server
+cargo run --release -- \
   --data-dir ./data \
   --token-config ./tokens.json \
   --type-config ./entity_types.json
 ```
 
 The server starts on `http://0.0.0.0:8765` by default.
+
+### Tests and benchmarks
+
+```bash
+cargo test                          # unit + integration suites
+uv run benchmarks/parity_check.py   # wire-level parity vs Python fixtures
+uv run benchmarks/mcp_bench.py      # performance benchmark (see benchmarks/README.md)
+```
 
 ### Docker
 
@@ -70,7 +76,10 @@ docker-compose up -d
 | `--data-dir` | `MCP_DATA_DIR` | *(required)* | Directory for JSONL data files |
 | `--token-config` | `MCP_TOKEN_CONFIG` | *(required)* | Path to `tokens.json` |
 | `--type-config` | `MCP_TYPE_CONFIG` | *(none)* | Path to `entity_types.json` |
-| `--transport` | `MCP_TRANSPORT` | `http` | `http`, `sse`, or `streamable-http` |
+| `--transport` | `MCP_TRANSPORT` | `http` | `http` or `streamable-http` (aliases for the MCP streamable HTTP transport; the deprecated `sse` transport was removed) |
+
+`MEMORY_UI_SECRET` signs web UI session cookies; if unset, an ephemeral
+secret is generated and sessions reset on restart.
 
 ### tokens.json
 
@@ -145,7 +154,9 @@ Clients authenticate by sending a Bearer token in the HTTP `Authorization` heade
 Authorization: Bearer myuser_a1b2c3...
 ```
 
-A fallback `MEMORY_TOKEN` environment variable is checked if no header is present.
+A Bearer token is required on every request. (The Python version's
+`MEMORY_TOKEN` environment fallback, which silently authenticated
+header-less requests, was removed.)
 
 ## MCP Client Configuration
 
@@ -159,6 +170,33 @@ Knowledge graphs are stored as JSONL files (one JSON object per line) in the con
 {"type": "entity", "name": "Alice", "entityType": "Person", "observations": ["Engineer", "Works on Project X"], "createdAt": "2026-03-23T14:30:00+00:00", "lastUpdated": "2026-03-23T14:30:00+00:00"}
 {"type": "relation", "from": "Alice", "to": "Project X", "relationType": "worksOn", "createdAt": "2026-03-23T14:30:00+00:00", "lastUpdated": "2026-03-23T14:30:00+00:00"}
 ```
+
+## Differences from the Python implementation (v0.2.x)
+
+The MCP wire contract and data file format are identical — verified by
+`benchmarks/parity_check.py` against captured fixtures, and data files are
+byte-identical modulo timestamps. Intentional differences:
+
+- **Auth**: `MEMORY_TOKEN` env fallback removed; token comparison is
+  constant-time.
+- **Transports**: `sse` removed (deprecated by the MCP spec); `http` and
+  `streamable-http` both select streamable HTTP.
+- **Storage**: in-memory with atomic, fsynced writes. Concurrent writes
+  serialize instead of corrupting the file. A malformed line still fails the
+  load, but the error names the file and line number.
+- **Error text**: malformed tool inputs produce serde messages (e.g.
+  ``missing field `name` ``) instead of Python's bare KeyError text.
+  Documented error messages ("Entity 'X' not found", read-only rejection,
+  unknown token) are unchanged.
+- **Input hygiene**: a `"type"` key inside a submitted entity/relation is
+  stripped; in Python it could clobber the JSONL line discriminator and make
+  the row vanish on the next load.
+- **Web UI**: identical routes and templates; sessions are HMAC-SHA256
+  cookies (existing Python sessions are invalidated once at cutover); the
+  graph page URL-encodes the center parameter, closing a reflected-XSS
+  vector.
+- **Tool listing**: tools are listed alphabetically and FastMCP's internal
+  `meta.fastmcp.tags` is absent.
 
 ## License
 

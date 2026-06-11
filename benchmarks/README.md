@@ -63,3 +63,35 @@ every write rewrites, the whole JSONL file. The race check failed: 40
 concurrent creates produced 39 errors and corrupted the store (NUL bytes and
 truncated lines), after which all reads failed. Any refresh should beat both
 the latency curve and the race check.
+
+`results/rust-v0.3.0.json` is the Rust server on the same machine
+(2026-06-11). The race check passes (40/40 concurrent creates survive,
+zero errors):
+
+| entities | search_nodes | open_nodes | read_graph | create_entities(1) |
+|---------:|-------------:|-----------:|-----------:|-------------------:|
+|      100 |       1.8 ms |     1.5 ms |     2.8 ms |             6.7 ms |
+|    1,000 |       3.4 ms |     1.7 ms |      15 ms |             8.2 ms |
+|   10,000 |        18 ms |     1.7 ms |     148 ms |              21 ms |
+|   50,000 |        27 ms |     3.2 ms |     769 ms |              80 ms |
+
+Reads are served from memory (no file I/O); writes persist the whole file
+via temp-file + fsync + atomic rename, which is why a single-entity write
+costs more at small sizes than Python's unsynced write (6.7 ms vs 4.3 ms at
+100 entities) but scales far better (21 ms vs 80 ms at 10k). `read_graph`
+remains size-bound because it serializes the entire graph over the wire.
+
+## Parity checking
+
+`parity_check.py` replays the captured fixture sequence
+(`fixtures/python-v0.2.0/`) against a live server and diffs every result
+against the Python ground truth (timestamps masked):
+
+```bash
+uv run benchmarks/parity_check.py --url http://127.0.0.1:8765/mcp \
+  --rw-token <rw-token> --ro-token <ro-token>
+```
+
+The target must be freshly started on an empty data file with a read-write
+and a read-only token sharing that file. The Rust v0.3.0 server passes with
+only FastMCP-internal tool metadata (`meta.fastmcp.tags`) differing.
