@@ -221,6 +221,32 @@ async fn search_filters_rows() {
 }
 
 #[tokio::test]
+async fn root_redirects_to_ui() {
+    let t = test_app();
+    let (status, headers, _) = send(&t.app, get("/", None)).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert_eq!(headers[header::LOCATION], "/ui/");
+}
+
+#[tokio::test]
+async fn search_sorts_by_column() {
+    let t = test_app();
+    let cookie = session_cookie(RW_TOKEN);
+
+    // Descending name: Project X before Bob before Alice (reverse of default).
+    let (_, _, body) = send(&t.app, get("/ui/search?sort=name&dir=desc", Some(&cookie))).await;
+    let a = body.find(">Alice<").unwrap();
+    let b = body.find(">Bob<").unwrap();
+    assert!(b < a, "desc name should put Bob before Alice");
+
+    // Ascending name (explicit) matches the default order.
+    let (_, _, body) = send(&t.app, get("/ui/search?sort=name&dir=asc", Some(&cookie))).await;
+    let a = body.find(">Alice<").unwrap();
+    let b = body.find(">Bob<").unwrap();
+    assert!(a < b, "asc name should put Alice before Bob");
+}
+
+#[tokio::test]
 async fn entity_detail_splits_relations() {
     let t = test_app();
     let cookie = session_cookie(RW_TOKEN);

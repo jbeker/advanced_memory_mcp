@@ -127,6 +127,12 @@ fn current_user_or_401(ui: &WebUi, headers: &HeaderMap) -> Result<CurrentUser, R
     })
 }
 
+/// Redirect the bare site root to the UI so users don't have to remember the
+/// `/ui/` subpath; they land on the login page (or list, if authenticated).
+async fn root_redirect() -> Response {
+    (StatusCode::SEE_OTHER, [(header::LOCATION, "/ui/")]).into_response()
+}
+
 async fn serve_static(Path(path): Path<String>) -> Response {
     for (name, content_type, bytes) in STATIC_FILES {
         if *name == path {
@@ -140,6 +146,7 @@ async fn serve_static(Path(path): Path<String>) -> Response {
 pub fn router(state: Arc<AppState>, ui_secret: String) -> Router {
     let ui = Arc::new(WebUi::new(state, ui_secret));
     Router::new()
+        .route("/", get(root_redirect))
         .route("/ui/login", get(views::login_get).post(views::login_post))
         .route("/ui/logout", post(views::logout))
         .route("/ui/", get(views::entity_list))

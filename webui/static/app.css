@@ -98,6 +98,9 @@ table.entities th, table.entities td {
 }
 table.entities th { color: var(--muted); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
 table.entities td.num, table.entities th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.entities th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+table.entities th.sortable:hover { color: var(--accent); }
+table.entities th .arrow { font-size: 0.8em; color: var(--accent); }
 table.entities a { color: var(--accent); text-decoration: none; }
 table.entities a:hover { text-decoration: underline; }
 .muted { color: var(--muted); font-size: 0.9em; }

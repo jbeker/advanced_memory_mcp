@@ -52,6 +52,36 @@ fn filter_entities<'a>(
         .collect()
 }
 
+/// Order entities in place by the requested column. `sort_by_key` is stable,
+/// so `reverse()` yields a well-defined descending order. Unknown keys fall
+/// back to name; default dir is ascending — preserving the original behavior.
+fn sort_entities(entities: &mut [&Entity], sort: &str, dir: &str) {
+    match sort {
+        "type" => entities.sort_by_key(|e| e.entity_type_str().to_lowercase()),
+        "observations" => entities.sort_by_key(|e| e.observations_slice().len()),
+        "updated" => entities.sort_by_key(|e| e.last_updated.clone().unwrap_or_default()),
+        _ => entities.sort_by_key(|e| e.name.to_lowercase()),
+    }
+    if dir == "desc" {
+        entities.reverse();
+    }
+}
+
+/// Normalize a raw sort key to one of the accepted columns.
+fn sort_key(raw: Option<&str>) -> &'static str {
+    match raw {
+        Some("type") => "type",
+        Some("observations") => "observations",
+        Some("updated") => "updated",
+        _ => "name",
+    }
+}
+
+/// Normalize a raw direction to `asc`/`desc` (default `asc`).
+fn sort_dir(raw: Option<&str>) -> &'static str {
+    if raw == Some("desc") { "desc" } else { "asc" }
+}
+
 #[derive(Deserialize)]
 pub(super) struct NextParam {
     next: Option<String>,
@@ -121,6 +151,7 @@ pub(super) async fn logout() -> Response {
 
 pub(super) async fn entity_list(
     State(ui): State<Arc<WebUi>>,
+    Query(params): Query<SearchParams>,
     headers: HeaderMap,
 ) -> Response {
     let user = match current_user_or_login_redirect(&ui, &headers, "/ui/", None) {
@@ -131,9 +162,11 @@ pub(super) async fn entity_list(
         Ok(s) => s,
         Err(resp) => return resp,
     };
+    let sort = sort_key(params.sort.as_deref());
+    let dir = sort_dir(params.dir.as_deref());
     let (entities, distinct_types) = store.read(|g| {
         let mut entities: Vec<&Entity> = g.entities.iter().collect();
-        entities.sort_by_key(|e| e.name.to_lowercase());
+        sort_entities(&mut entities, sort, dir);
         let types: BTreeSet<String> = g
             .entities
             .iter()
@@ -151,6 +184,8 @@ pub(super) async fn entity_list(
         context! {
             entities => entities,
             distinct_types => distinct_types,
+            sort => sort,
+            dir => dir,
             user_label => user_label(&user.token),
             read_only => user.entry.is_read_only(),
         },
@@ -162,6 +197,8 @@ pub(super) struct SearchParams {
     q: Option<String>,
     #[serde(rename = "type")]
     type_filter: Option<String>,
+    sort: Option<String>,
+    dir: Option<String>,
 }
 
 /// htmx fragment endpoint: returns just the tbody rows.
@@ -178,10 +215,12 @@ pub(super) async fn entity_list_rows(
         Ok(s) => s,
         Err(resp) => return resp,
     };
+    let sort = sort_key(params.sort.as_deref());
+    let dir = sort_dir(params.dir.as_deref());
     let entities = store.read(|g| {
         let mut filtered =
             filter_entities(&g.entities, params.q.as_deref(), params.type_filter.as_deref());
-        filtered.sort_by_key(|e| e.name.to_lowercase());
+        sort_entities(&mut filtered, sort, dir);
         filtered.iter().map(|e| ui_entity(e)).collect::<Vec<_>>()
     });
     html(render(&ui, "entity_list_rows.html", context! { entities => entities }))

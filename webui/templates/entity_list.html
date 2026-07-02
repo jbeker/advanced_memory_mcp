@@ -35,15 +35,17 @@
         <option value="{{ t }}">{{ t }}</option>
         {% endfor %}
       </select>
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir" value="{{ dir }}">
     </div>
   </header>
-  <table class="entities">
+  <table class="entities" data-sort="{{ sort }}" data-dir="{{ dir }}">
     <thead>
       <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th class="num">Observations</th>
-        <th>Last updated</th>
+        <th class="sortable" data-sort="name">Name <span class="arrow"></span></th>
+        <th class="sortable" data-sort="type">Type <span class="arrow"></span></th>
+        <th class="sortable num" data-sort="observations">Observations <span class="arrow"></span></th>
+        <th class="sortable" data-sort="updated">Last updated <span class="arrow"></span></th>
       </tr>
     </thead>
     <tbody id="entity-rows">
@@ -51,4 +53,41 @@
     </tbody>
   </table>
 </section>
+<script>
+  (function () {
+    var table = document.querySelector("table.entities");
+    if (!table) return;
+    var filters = document.querySelector(".filters");
+    var sortInput = filters.querySelector('input[name="sort"]');
+    var dirInput = filters.querySelector('input[name="dir"]');
+    var search = filters.querySelector('input[name="q"]');
+
+    function paintArrows() {
+      var sort = sortInput.value || "name";
+      var dir = dirInput.value === "desc" ? "desc" : "asc";
+      table.querySelectorAll("th.sortable").forEach(function (th) {
+        var arrow = th.querySelector(".arrow");
+        arrow.textContent = th.dataset.sort === sort ? (dir === "desc" ? "▼" : "▲") : "";
+      });
+    }
+
+    table.querySelectorAll("th.sortable").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var col = th.dataset.sort;
+        if (sortInput.value === col) {
+          dirInput.value = dirInput.value === "desc" ? "asc" : "desc";
+        } else {
+          sortInput.value = col;
+          dirInput.value = "asc";
+        }
+        paintArrows();
+        // Reuse the search input's htmx config to swap #entity-rows, sending
+        // the current filters (including the updated sort/dir hidden inputs).
+        htmx.trigger(search, "search");
+      });
+    });
+
+    paintArrows();
+  })();
+</script>
 {% endblock %}
