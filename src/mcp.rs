@@ -22,6 +22,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
     CallToolRequestParams, CallToolResult, Content, Implementation, JsonObject,
     ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
+    ToolAnnotations,
 };
 use rmcp::service::RequestContext;
 use rmcp::{ErrorData, RoleServer, ServerHandler, tool, tool_router};
@@ -172,6 +173,57 @@ fn output_schema() -> Arc<JsonObject> {
         "additionalProperties": true,
         "type": "object",
     })))
+}
+
+/// Behavioral hints advertised for each tool in tools/list. Per the MCP spec
+/// these are advisory only (see ToolAnnotations) and clients must not make
+/// security decisions from them. Every tool operates on a single user's local
+/// knowledge graph, so all set openWorldHint=false. Read tools set
+/// readOnlyHint=true; write tools declare whether they are destructive (remove
+/// or overwrite existing data) and idempotent (a repeat with the same args
+/// leaves the graph unchanged).
+fn tool_annotations(name: &str) -> Option<ToolAnnotations> {
+    // Read-only tool: never mutates the graph.
+    let read = |title: &str| {
+        ToolAnnotations::with_title(title)
+            .read_only(true)
+            .open_world(false)
+    };
+    // Write tool: declares destructive/idempotent explicitly.
+    let write = |title: &str, destructive: bool, idempotent: bool| {
+        ToolAnnotations::with_title(title)
+            .read_only(false)
+            .destructive(destructive)
+            .idempotent(idempotent)
+            .open_world(false)
+    };
+    Some(match name {
+        // Additive writes: dedup by identity, so a replay is a no-op (idempotent)
+        // and nothing existing is removed (non-destructive).
+        "create_entities" => write("Create Entities", false, true),
+        "create_relations" => write("Create Relations", false, true),
+        "add_observations" => write("Add Observations", false, true),
+        // Deletes remove data (destructive) but silently ignore already-absent
+        // targets, so replaying reaches the same state (idempotent).
+        "delete_entities" => write("Delete Entities", true, true),
+        "delete_observations" => write("Delete Observations", true, true),
+        "delete_relations" => write("Delete Relations", true, true),
+        // Rename doesn't drop data, but a replay errors (source now gone), so
+        // it is neither destructive nor idempotent.
+        "rename_entity" => write("Rename Entity", false, false),
+        // Merge removes the source entity (destructive) and a replay errors
+        // (source gone), so it is not idempotent.
+        "merge_entities" => write("Merge Entities", true, false),
+        // Normalization rewrites types in place; a second run finds nothing left
+        // to change (idempotent) and discards no data (non-destructive).
+        "normalize_entity_types" => write("Normalize Entity Types", false, true),
+        // Pure reads.
+        "search_facts" => read("Search Facts"),
+        "read_graph" => read("Read Graph"),
+        "search_nodes" => read("Search Nodes"),
+        "open_nodes" => read("Open Nodes"),
+        _ => return None,
+    })
 }
 
 // ---- typed parameter wrappers (deserialization only; schemas above) ----
@@ -656,10 +708,12 @@ impl ServerHandler for MemoryServer {
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         // The Python server advertises a permissive outputSchema on every
-        // tool; the #[tool] macro can't set one, so add it here.
+        // tool; the #[tool] macro can't set one, so add it (and behavioral
+        // annotations) here.
         let mut tools: Vec<Tool> = self.tool_router.list_all();
         for tool in &mut tools {
             tool.output_schema = Some(output_schema());
+            tool.annotations = tool_annotations(tool.name.as_ref());
         }
         Ok(ListToolsResult { tools, meta: None, next_cursor: None })
     }
