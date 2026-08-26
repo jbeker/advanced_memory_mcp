@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! Liveness endpoint and the self-probe used by the Docker HEALTHCHECK.
 //!
 //! GET /health is unauthenticated and reports only liveness plus the server

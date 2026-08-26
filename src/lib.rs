@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! Advanced Memory MCP — Rust implementation.
 //!
 //! Multi-user MCP memory server. Same MCP tool surface and JSONL data format

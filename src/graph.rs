@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! In-memory knowledge graph model and operations.
 //!
 //! Port of `knowledge_graph.py`. The Python implementation is the behavioral

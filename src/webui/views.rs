@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! HTML page handlers. Port of `webui/views.py`.
 
 use super::auth::{

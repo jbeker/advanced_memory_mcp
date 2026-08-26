@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! Web UI integration tests. Port of the Python tests/ suite semantics:
 //! test_auth.py, test_views.py, test_mutations.py, test_graph_api.py,
 //! test_entity_detail.py, test_static.py.

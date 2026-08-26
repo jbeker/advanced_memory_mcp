@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! tokens.json loading and lookup. Port of `token_config.py`.
 //!
 //! Security note: unlike the Python version's dict lookup, `get` scans all

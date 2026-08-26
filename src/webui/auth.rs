@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! Cookie-based session auth for the web UI. Port of `webui/auth.py`.
 //!
 //! Same model: the user pastes their MCP bearer token at /ui/login, we

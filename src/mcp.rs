@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! MCP tool surface. Port of `server.py`.
 //!
 //! Tool names, argument names, descriptions, input schemas, response shapes,

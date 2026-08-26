@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! JSONL persistence and the in-memory store registry.
 //!
 //! This replaces Python's load-on-every-call / truncate-write-on-every-call

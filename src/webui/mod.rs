@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Jeremy Beker
+
 //! Web UI: same routes and templates as the Python `webui` package, served
 //! by the same binary as the MCP endpoint. Templates and static assets are
 //! embedded at compile time (no filesystem access, no traversal surface).
